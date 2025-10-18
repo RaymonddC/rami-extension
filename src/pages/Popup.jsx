@@ -1,14 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   BookOpen,
   Sparkles,
   Settings,
   LayoutDashboard,
   Highlighter,
+  X,
+  Loader2,
+  Copy,
+  CheckCircle,
 } from 'lucide-react';
 import { usePreferences, useSavedReadings } from '../hooks/useChromeStorage';
-import { PERSONAS } from '../utils/summarize';
+import { PERSONAS, summarizeText } from '../utils/summarize';
+
+/**
+ * Check if a method is an AI-based method
+ */
+function isAIMethod(method) {
+  return ['summarizer-api', 'chrome-ai', 'language-model-api', 'gemini-nano'].includes(method);
+}
 
 /**
  * Popup Component
@@ -18,6 +29,10 @@ export default function Popup() {
   const { preferences, setPreferences } = usePreferences();
   const { readings } = useSavedReadings();
   const [currentTab, setCurrentTab] = useState(null);
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     // Get current tab info
@@ -59,12 +74,58 @@ export default function Popup() {
     chrome.runtime.openOptionsPage();
   };
 
+  const summarizePage = async () => {
+    if (!currentTab) return;
+
+    setLoading(true);
+    setShowSummary(true);
+    setSummary(null);
+
+    try {
+      // Get page content
+      const [result] = await chrome.scripting.executeScript({
+        target: { tabId: currentTab.id },
+        func: () => {
+          const article = document.querySelector('article') || document.body;
+          return article.innerText.substring(0, 5000); // Get first 5000 chars
+        },
+      });
+
+      const pageContent = result.result;
+
+      // Summarize using AI
+      const summaryResult = await summarizeText(pageContent, {
+        persona: preferences?.persona || 'strategist',
+        length: 'medium',
+      });
+
+      setSummary(summaryResult);
+    } catch (error) {
+      console.error('Failed to summarize:', error);
+      setSummary({
+        success: false,
+        summary: 'Failed to summarize page. Please try again.',
+        method: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copySummary = async () => {
+    if (summary?.summary) {
+      await navigator.clipboard.writeText(summary.summary);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   const currentPersona = PERSONAS[preferences?.persona || 'strategist'];
 
   return (
-    <div className="w-[400px] h-[600px] bg-white dark:bg-neutral-900">
+    <div className="w-[400px] h-[600px] bg-white dark:bg-neutral-900 flex flex-col">
       {/* Header */}
-      <div className="bg-gradient-to-r from-primary-500 to-primary-600 p-6 text-white">
+      <div className="bg-gradient-to-r from-primary-500 to-primary-600 p-6 text-white flex-shrink-0">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold">AI Reading Studio</h1>
           <button
@@ -84,7 +145,22 @@ export default function Popup() {
         </div>
       </div>
 
+      {/* Summary Panel */}
+      <AnimatePresence>
+        {showSummary && (
+          <SummaryPanel
+            summary={summary}
+            loading={loading}
+            onClose={() => setShowSummary(false)}
+            onCopy={copySummary}
+            copied={copied}
+            persona={currentPersona}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Quick Actions */}
+      <div className="flex-1 overflow-auto">
       <div className="p-4 space-y-3">
         <QuickAction
           icon={<BookOpen className="w-5 h-5" />}
@@ -104,9 +180,7 @@ export default function Popup() {
           icon={<Sparkles className="w-5 h-5" />}
           label="Summarize Page"
           description="Get AI summary of current page"
-          onClick={() => {
-            chrome.tabs.sendMessage(currentTab.id, { action: 'summarize-page' });
-          }}
+          onClick={summarizePage}
         />
 
         <QuickAction
@@ -160,6 +234,7 @@ export default function Popup() {
           <div>📝 <kbd>Alt+S</kbd> - Summarize Selection</div>
         </div>
       </div>
+      </div>
     </div>
   );
 }
@@ -207,5 +282,92 @@ function RecentReadingItem({ reading, onClick }) {
         {new Date(reading.timestamp).toLocaleDateString()}
       </div>
     </motion.button>
+  );
+}
+
+/**
+ * Summary Panel Component
+ */
+function SummaryPanel({ summary, loading, onClose, onCopy, copied, persona }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="flex-1 bg-neutral-50 dark:bg-neutral-850 border-t border-neutral-200 dark:border-neutral-700 flex flex-col overflow-hidden"
+    >
+      {/* Summary Header */}
+      <div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-700">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-primary-500" />
+          <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">
+            Page Summary
+          </h3>
+        </div>
+        <button
+          onClick={onClose}
+          className="p-1 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Summary Content */}
+      <div className="flex-1 overflow-auto p-4">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center h-full">
+            <Loader2 className="w-8 h-8 text-primary-500 animate-spin mb-3" />
+            <p className="text-sm text-neutral-600 dark:text-neutral-400">
+              {persona.icon} {persona.name} is analyzing...
+            </p>
+          </div>
+        ) : summary ? (
+          <div className="space-y-3">
+            {/* Persona Badge */}
+            <div className="flex items-center gap-2 text-xs">
+              <span className="badge badge-primary">
+                {persona.icon} {persona.name}
+              </span>
+              <span className="text-neutral-500 dark:text-neutral-400">
+                {isAIMethod(summary.method) ? '🤖 AI' : '📝 Fallback'}
+              </span>
+            </div>
+
+            {/* Summary Text */}
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <p className="text-sm text-neutral-900 dark:text-neutral-100 leading-relaxed">
+                {summary.summary}
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2 pt-3 border-t border-neutral-200 dark:border-neutral-700">
+              <button
+                onClick={onCopy}
+                className="btn-secondary text-sm flex items-center gap-2"
+              >
+                {copied ? (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    Copy
+                  </>
+                )}
+              </button>
+
+              {summary.method === 'fallback' && (
+                <div className="flex-1 text-xs text-neutral-500 dark:text-neutral-400">
+                  💡 Enable Chrome AI for better summaries
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </motion.div>
   );
 }

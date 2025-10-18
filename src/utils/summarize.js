@@ -100,7 +100,9 @@ export async function checkAIAvailability() {
 
     const isAvailable =
       languageModelStatus.available === 'readily' ||
-      summarizerStatus.available === 'readily';
+      languageModelStatus.available === 'available' ||
+      summarizerStatus.available === 'readily' ||
+      summarizerStatus.available === 'available';
 
     if (!isAvailable) {
       console.warn('⏳ AI models not ready. Status:', {
@@ -112,6 +114,9 @@ export async function checkAIAvailability() {
           summarizerStatus.available === 'after-download') {
         console.log('📥 Gemini Nano needs to download. This may take a few minutes.');
         console.log('💡 Trigger download: await ai.languageModel.create()');
+      } else if (languageModelStatus.available === 'unavailable' ||
+                 summarizerStatus.available === 'unavailable') {
+        console.log('❌ AI models are unavailable. Check Chrome flags and system requirements.');
       }
     }
 
@@ -139,38 +144,75 @@ export async function checkAIAvailability() {
 export async function summarizeText(text, options = {}) {
   try {
     const { type = 'key-points', length = 'medium', persona = 'strategist' } = options;
-
-    // Check if summarizer is available
-    if (!self.ai || !self.ai.summarizer) {
-      console.log('📝 Summarizer not available, using fallback');
-      return await fallbackSummarize(text, options);
-    }
-
-    // Check capabilities
-    const capabilities = await self.ai.summarizer.capabilities();
-    if (capabilities.available !== 'readily') {
-      console.warn(`⏳ Summarizer status: ${capabilities.available}`);
-      return await fallbackSummarize(text, options);
-    }
-
-    console.log('🤖 Using Chrome AI Summarizer');
-    const summarizer = await self.ai.summarizer.create({
-      type,
-      length,
-    });
-
-    const summary = await summarizer.summarize(text);
-
-    // Apply persona styling to summary
     const personaConfig = PERSONAS[persona];
-    const styledSummary = await applyPersonaTone(summary, personaConfig);
 
-    return {
-      success: true,
-      summary: styledSummary,
-      method: 'chrome-ai',
-      persona: personaConfig.name
-    };
+    // Try new Summarizer API (window.Summarizer)
+    if ('Summarizer' in self) {
+      try {
+        const availability = await self.Summarizer.availability();
+        console.log('📝 New Summarizer API availability:', availability);
+
+        if (availability === 'readily' || availability === 'available') {
+          console.log('🤖 Using new Summarizer API');
+          const summarizer = await self.Summarizer.create({
+            type: type,
+            format: 'plain-text',
+            length: length,
+            sharedContext: personaConfig.systemPrompt
+          });
+
+          const summary = await summarizer.summarize(text);
+          await summarizer.destroy();
+
+          return {
+            success: true,
+            summary: summary,
+            method: 'summarizer-api',
+            persona: personaConfig.name
+          };
+        }
+      } catch (error) {
+        console.warn('New Summarizer API failed:', error.message);
+      }
+    }
+
+    // Try old ai.summarizer API
+    if (self.ai?.summarizer) {
+      try {
+        const capabilities = await self.ai.summarizer.capabilities();
+        console.log('📝 Old summarizer API status:', capabilities);
+
+        if (capabilities.available === 'readily' || capabilities.available === 'available') {
+          console.log('🤖 Using ai.summarizer API');
+          const summarizer = await self.ai.summarizer.create({
+            type,
+            length,
+          });
+
+          const summary = await summarizer.summarize(text);
+          await summarizer.destroy();
+
+          return {
+            success: true,
+            summary: summary,
+            method: 'chrome-ai',
+            persona: personaConfig.name
+          };
+        } else {
+          console.warn(`⏳ Summarizer status: ${capabilities.available}`);
+          if (capabilities.available === 'unavailable') {
+            console.warn('❌ Summarizer is unavailable. Check Chrome flags.');
+          }
+        }
+      } catch (error) {
+        console.warn('Old summarizer API failed:', error.message);
+      }
+    }
+
+    // Fallback
+    console.log('📝 No summarizer available, using fallback');
+    return await fallbackSummarize(text, options);
+
   } catch (error) {
     console.error('❌ Summarization failed:', error);
     console.log('↩️ Falling back to simple extraction');
@@ -184,36 +226,76 @@ export async function summarizeText(text, options = {}) {
 export async function queryLanguageModel(prompt, options = {}) {
   try {
     const { persona = 'strategist', temperature = 0.7, maxTokens = 1000 } = options;
-
-    if (!self.ai?.languageModel) {
-      console.log('🤖 Language Model not available, using mock');
-      return await mockLanguageModelResponse(prompt, options);
-    }
-
-    // Check capabilities
-    const capabilities = await self.ai.languageModel.capabilities();
-    if (capabilities.available !== 'readily') {
-      console.warn(`⏳ Language Model status: ${capabilities.available}`);
-      return await mockLanguageModelResponse(prompt, options);
-    }
-
-    console.log('🤖 Using Gemini Nano Language Model');
     const personaConfig = PERSONAS[persona];
-    const fullPrompt = `${personaConfig.systemPrompt}\n\n${personaConfig.promptStyle}\n\n${prompt}`;
 
-    const session = await self.ai.languageModel.create({
-      temperature,
-      topK: 3,
-    });
+    // Try new LanguageModel API
+    if ('LanguageModel' in self) {
+      try {
+        const availability = await self.LanguageModel.availability();
+        console.log('🤖 LanguageModel API availability:', availability);
 
-    const response = await session.prompt(fullPrompt);
+        if (availability === 'readily' || availability === 'available') {
+          console.log('🤖 Using new LanguageModel API');
+          const session = await self.LanguageModel.create({
+            temperature,
+            topK: 3,
+            systemPrompt: personaConfig.systemPrompt
+          });
 
-    return {
-      success: true,
-      response,
-      persona: personaConfig.name,
-      method: 'gemini-nano'
-    };
+          const fullPrompt = `${personaConfig.promptStyle}\n\n${prompt}`;
+          const response = await session.prompt(fullPrompt);
+          await session.destroy();
+
+          return {
+            success: true,
+            response,
+            persona: personaConfig.name,
+            method: 'language-model-api'
+          };
+        }
+      } catch (error) {
+        console.warn('New LanguageModel API failed:', error.message);
+      }
+    }
+
+    // Try old ai.languageModel API
+    if (self.ai?.languageModel) {
+      try {
+        const capabilities = await self.ai.languageModel.capabilities();
+        console.log('🤖 Old Language Model status:', capabilities);
+
+        if (capabilities.available === 'readily' || capabilities.available === 'available') {
+          console.log('🤖 Using ai.languageModel API');
+          const fullPrompt = `${personaConfig.systemPrompt}\n\n${personaConfig.promptStyle}\n\n${prompt}`;
+
+          const session = await self.ai.languageModel.create({
+            temperature,
+            topK: 3,
+          });
+
+          const response = await session.prompt(fullPrompt);
+          await session.destroy();
+
+          return {
+            success: true,
+            response,
+            persona: personaConfig.name,
+            method: 'gemini-nano'
+          };
+        } else {
+          console.warn(`⏳ Language Model status: ${capabilities.available}`);
+          if (capabilities.available === 'unavailable') {
+            console.warn('❌ Language Model is unavailable. Check Chrome flags.');
+          }
+        }
+      } catch (error) {
+        console.warn('Old language model API failed:', error.message);
+      }
+    }
+
+    // Fallback to mock
+    console.log('🤖 Language Model not available, using mock');
+    return await mockLanguageModelResponse(prompt, options);
   } catch (error) {
     console.error('❌ Language model query failed:', error);
     console.log('↩️ Using mock response');
