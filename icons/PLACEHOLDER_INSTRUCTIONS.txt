@@ -1,0 +1,18 @@
+To create placeholder icons quickly:
+
+Option 1: Use an online tool
+- Visit: https://www.favicon-generator.org/
+- Upload any image or create a simple colored square
+- Download and rename to icon16.png, icon48.png, icon128.png
+
+Option 2: Use ImageMagick (if installed)
+convert -size 16x16 xc:#f97316 icon16.png
+convert -size 48x48 xc:#f97316 icon48.png
+convert -size 128x128 xc:#f97316 icon128.png
+
+Option 3: Use any image editor
+- Create 16x16, 48x48, and 128x128 pixel images
+- Fill with orange color (#f97316)
+- Save as PNG in this folder
+
+The extension will work without custom icons but Chrome will show a default gray icon.
