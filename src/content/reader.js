@@ -457,28 +457,43 @@
     const text = selection.toString().trim();
 
     if (text.length < 100) {
-      alert('Please select more text for mindmap generation');
+      showNotification('Please select more text (at least 100 characters)', 'error');
       return;
     }
 
     showNotification('Generating mindmap...', 'info');
 
     try {
+      // Send text to background script for concept extraction
       const response = await chrome.runtime.sendMessage({
-        action: 'extract-concepts',
-        text: text,
+        action: 'generate-mindmap',
+        data: {
+          text: text,
+          title: document.title,
+          url: window.location.href,
+        },
       });
 
       if (response.success) {
-        // Open dashboard with concepts
+        showNotification('Mindmap generated successfully!', 'success');
+        // Open dashboard
         chrome.runtime.sendMessage({
           action: 'open-dashboard',
-          data: { concepts: response.data },
+          tab: 'mindmap',
         });
+      } else {
+        throw new Error(response.error || 'Failed to extract concepts');
       }
     } catch (error) {
       console.error('Mindmap generation error:', error);
-      showNotification('Error generating mindmap', 'error');
+
+      // Check if it's the "Extension context invalidated" error
+      if (error.message.includes('Extension context invalidated')) {
+        showNotification('⚠️ Please reload this page after updating the extension', 'error');
+        console.log('💡 Tip: Press F5 or Ctrl+R to reload the page');
+      } else {
+        showNotification('Error generating mindmap: ' + error.message, 'error');
+      }
     }
   }
 
