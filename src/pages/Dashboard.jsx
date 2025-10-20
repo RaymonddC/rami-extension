@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Map, List, Brain, FileText, LayoutGrid } from 'lucide-react';
+import {Map, List, Brain, FileText, LayoutGrid, Trash2} from 'lucide-react';
 import { useSavedReadings, usePreferences } from '../hooks/useChromeStorage';
 import MindmapView, { MindmapEmptyState } from '../components/MindmapView';
 import MermaidView from '../components/MermaidView';
@@ -168,9 +168,13 @@ function ReadingsList({ readings, onSelect, selected }) {
           <p className="text-sm text-neutral-600 dark:text-neutral-400 line-clamp-3 mb-3">
             {reading.excerpt || reading.content?.substring(0, 150)}
           </p>
-          <div className="text-xs text-neutral-500">
-            {new Date(reading.timestamp).toLocaleDateString()}
-          </div>
+            <div className="flex items-center justify-between text-xs text-neutral-500">
+                <span>{new Date(reading.timestamp).toLocaleDateString()}</span>
+
+                <button className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-100 rounded-lg transition">
+                    <Trash2 size={16} />
+                </button>
+            </div>
         </motion.button>
       ))}
     </div>
