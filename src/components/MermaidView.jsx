@@ -122,6 +122,7 @@ export default function MermaidView({ concepts = [], title = 'Mindmap' }) {
 
 /**
  * Generate Mermaid mindmap syntax from concepts
+ * Uses hierarchical structure: main -> secondary -> tertiary
  */
 function generateMermaidCode(concepts, title) {
   if (!concepts || concepts.length === 0) {
@@ -132,25 +133,43 @@ function generateMermaidCode(concepts, title) {
 
   // Find the main concept
   const mainConcept = concepts.find(c => c.type === 'main') || concepts[0];
-  const otherConcepts = concepts.filter(c => c.id !== mainConcept.id);
+
+  // Get secondary concepts (direct children of main)
+  const secondaryConcepts = concepts.filter(c => c.type === 'secondary');
+
+  // Get tertiary concepts (children of secondary)
+  const tertiaryConcepts = concepts.filter(c => c.type === 'tertiary');
 
   let code = `mindmap
   root((${mainConcept.label}))
 `;
 
-  // Add connected concepts
-  otherConcepts.forEach((concept) => {
-    code += `    ${concept.label}\n`;
+  // Add secondary concepts
+  secondaryConcepts.forEach((secondary) => {
+    code += `    ${secondary.label}\n`;
 
-    // Add sub-concepts if they exist
-    if (concept.connections && concept.connections.length > 0) {
-      concept.connections.forEach((connId) => {
-        const connectedConcept = concepts.find(c => c.id === connId);
-        if (connectedConcept && connectedConcept.id !== mainConcept.id) {
-          code += `      ${connectedConcept.label}\n`;
-        }
-      });
-    }
+    // Find tertiary concepts that are children of this secondary
+    // A tertiary is a child if the secondary's connections include it
+    // AND the tertiary connects back to this secondary
+    const children = tertiaryConcepts.filter(tertiary => {
+      return tertiary.connections && tertiary.connections.includes(secondary.id);
+    });
+
+    // Add tertiary children
+    children.forEach((tertiary) => {
+      code += `      ${tertiary.label}\n`;
+    });
+  });
+
+  // Add any orphaned tertiary concepts (not connected to any secondary)
+  const orphanedTertiary = tertiaryConcepts.filter(tertiary => {
+    return !secondaryConcepts.some(secondary =>
+      tertiary.connections && tertiary.connections.includes(secondary.id)
+    );
+  });
+
+  orphanedTertiary.forEach((tertiary) => {
+    code += `    ${tertiary.label}\n`;
   });
 
   return code;

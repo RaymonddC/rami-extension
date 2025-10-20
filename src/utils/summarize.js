@@ -319,63 +319,424 @@ export async function queryLanguageModel(prompt, options = {}) {
  * Extract key concepts and relationships from text for mindmap generation
  */
 export async function extractConcepts(text, options = {}) {
-  const { persona = 'architect', maxConcepts = 10 } = options;
-  
+  const { persona = 'architect', maxConcepts = 12 } = options;
+
   console.log('🔍 extractConcepts called with:', { textLength: text?.length, persona, maxConcepts });
 
-  const prompt = `Analyze the following text and extract key concepts and their relationships.
+  // Preprocess text - extract more context (up to 5000 chars)
+  const processedText = text.substring(0, 5000).trim();
 
-Format your response as a JSON array of nodes with this structure:
+  // Get persona-specific instructions
+  const personaConfig = PERSONAS[persona] || PERSONAS.architect;
+  const personaInstructions = getPersonaMindmapInstructions(persona);
+
+  // Build comprehensive prompt
+  const prompt = `You are creating a hierarchical mindmap from text. Your goal is to identify ONE central concept and organize related ideas in a clear tree structure.
+
+${personaInstructions}
+
+CRITICAL RULES:
+1. Create EXACTLY ONE "main" concept (the central topic)
+2. Create 3-5 "secondary" concepts (major branches from main topic)
+3. For complex topics: Create 2-3 "tertiary" concepts under MOST secondary branches to add depth
+4. For simpler topics: You may use just 2 levels (main + secondary) if that's more natural
+5. NEVER repeat the same concept twice - each concept must be unique
+6. Keep labels concise (2-5 words maximum)
+7. Connections should form a PARENT-TO-CHILD tree structure
+8. Each concept only lists its CHILDREN in connections (not its parent)
+
+STRUCTURE & CONNECTIONS:
+- Main concept (type: "main")
+  → Lists its secondary children in connections
+  → Example: "connections": ["branch-1", "branch-2", "branch-3"]
+
+- Secondary concepts (type: "secondary")
+  → Lists its tertiary children in connections (NOT main)
+  → Example: "connections": ["detail-1-1", "detail-1-2"]
+
+- Tertiary concepts (type: "tertiary")
+  → Has empty connections array (leaf nodes)
+  → Example: "connections": []
+
+OUTPUT FORMAT - Return ONLY valid JSON array, no markdown, no explanation:
+
+EXAMPLE (showing proper 3-level hierarchy):
 [
   {
-    "id": "concept-1",
-    "label": "Main Concept",
+    "id": "main",
+    "label": "Built-in AI Capabilities",
     "type": "main",
-    "connections": ["concept-2", "concept-3"]
+    "connections": ["benefits", "deployment", "performance"]
+  },
+  {
+    "id": "benefits",
+    "label": "Benefits of Built-in AI",
+    "type": "secondary",
+    "connections": ["privacy", "offline-access", "cost-savings"]
+  },
+  {
+    "id": "privacy",
+    "label": "Privacy Protection",
+    "type": "tertiary",
+    "connections": []
+  },
+  {
+    "id": "offline-access",
+    "label": "Offline Functionality",
+    "type": "tertiary",
+    "connections": []
+  },
+  {
+    "id": "cost-savings",
+    "label": "Reduced API Costs",
+    "type": "tertiary",
+    "connections": []
+  },
+  {
+    "id": "deployment",
+    "label": "Ease of Deployment",
+    "type": "secondary",
+    "connections": ["simple-integration", "no-setup"]
+  },
+  {
+    "id": "simple-integration",
+    "label": "Simple Integration",
+    "type": "tertiary",
+    "connections": []
+  },
+  {
+    "id": "no-setup",
+    "label": "No Infrastructure",
+    "type": "tertiary",
+    "connections": []
+  },
+  {
+    "id": "performance",
+    "label": "Hardware Acceleration",
+    "type": "secondary",
+    "connections": ["gpu-support", "fast-response"]
+  },
+  {
+    "id": "gpu-support",
+    "label": "GPU Optimization",
+    "type": "tertiary",
+    "connections": []
+  },
+  {
+    "id": "fast-response",
+    "label": "Low Latency",
+    "type": "tertiary",
+    "connections": []
   }
 ]
 
-Text to analyze:
-${text.substring(0, 3000)}`;
+IMPORTANT: Your output must follow this exact pattern with 3 levels!
+
+TEXT TO ANALYZE:
+${processedText}
+
+Remember: Return ONLY the JSON array. Connections are PARENT → CHILD only (not bidirectional). No markdown code blocks, no extra text.`;
 
   try {
-    const result = await queryLanguageModel(prompt, { persona, maxTokens: 2000 });
+    const result = await queryLanguageModel(prompt, { persona, maxTokens: 2500 });
     console.log('🤖 Language model result:', result);
 
     if (result && result.response) {
-      // Try to parse JSON response
-      const jsonMatch = result.response.match(/\[[\s\S]*\]/);
+      // Extract JSON from response (handle markdown code blocks)
+      let jsonText = result.response.trim();
+
+      // Remove markdown code blocks if present
+      jsonText = jsonText.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+
+      // Try to find JSON array
+      const jsonMatch = jsonText.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
         try {
           const concepts = JSON.parse(jsonMatch[0]);
           console.log('✅ Parsed concepts from AI:', concepts);
 
           if (Array.isArray(concepts) && concepts.length > 0) {
-            return {
-              success: true,
-              concepts: concepts.slice(0, maxConcepts),
-              method: result.method
-            };
+            // Validate and clean concepts
+            let validatedConcepts = validateAndCleanConcepts(concepts, maxConcepts);
+
+            // Ensure we have a proper 3-level hierarchy
+            validatedConcepts = ensureHierarchicalStructure(validatedConcepts);
+
+            if (validatedConcepts.length > 0) {
+              console.log('✅ Validated concepts:', validatedConcepts.length);
+              return {
+                success: true,
+                concepts: validatedConcepts,
+                method: result.method
+              };
+            }
           } else {
             console.warn('⚠️ AI returned empty concepts array');
           }
         } catch (parseError) {
           console.error('❌ Failed to parse JSON from AI:', parseError.message);
+          console.log('Raw response:', result.response.substring(0, 300));
         }
       } else {
         console.warn('⚠️ No JSON array found in AI response');
-        console.log('Response preview:', result.response.substring(0, 200));
+        console.log('Response preview:', result.response.substring(0, 300));
       }
     }
   } catch (error) {
     console.error('❌ Language model query failed:', error);
   }
 
-  // Fallback to mock data
-  console.log('🔄 Falling back to mock concept extraction');
+  // Fallback to improved mock extraction
+  console.log('🔄 Falling back to enhanced concept extraction');
   const fallbackResult = await mockExtractConcepts(text, options);
   console.log('📊 Fallback returned:', fallbackResult.concepts.length, 'concepts');
   return fallbackResult;
+}
+
+/**
+ * Ensure concepts have proper 3-level hierarchy
+ * Only expand if we have SOME tertiary but not all secondary have children
+ */
+function ensureHierarchicalStructure(concepts) {
+  if (!concepts || concepts.length === 0) return concepts;
+
+  const main = concepts.find(c => c.type === 'main');
+  const secondary = concepts.filter(c => c.type === 'secondary');
+  const tertiary = concepts.filter(c => c.type === 'tertiary');
+
+  console.log(`📊 Structure check: ${main ? 1 : 0} main, ${secondary.length} secondary, ${tertiary.length} tertiary`);
+
+  // If AI generated NO tertiary at all, don't force it - maybe the content is simple
+  if (tertiary.length === 0) {
+    console.log('ℹ️ No tertiary concepts generated by AI - keeping structure as-is');
+    return concepts;
+  }
+
+  // If we have SOME tertiary but not all secondary have children, only expand those without
+  const expandedConcepts = [...concepts];
+  let addedCount = 0;
+
+  secondary.forEach((sec) => {
+    // Check if this secondary has any children
+    const hasChildren = tertiary.some(t =>
+      sec.connections && sec.connections.includes(t.id)
+    );
+
+    // Only expand if AI clearly intended hierarchy but missed this branch
+    if (!hasChildren && tertiary.length > 0 && addedCount < 3) {
+      // Create 2 tertiary children for this secondary
+      const child1Id = `detail-${sec.id}-1`;
+      const child2Id = `detail-${sec.id}-2`;
+
+      // Add children to secondary's connections
+      if (!sec.connections) sec.connections = [];
+      sec.connections.push(child1Id, child2Id);
+
+      // Create child concepts with more specific labels
+      const aspects = getSecondaryAspects(sec.label);
+
+      expandedConcepts.push({
+        id: child1Id,
+        label: aspects[0],
+        type: 'tertiary',
+        connections: []
+      });
+
+      expandedConcepts.push({
+        id: child2Id,
+        label: aspects[1],
+        type: 'tertiary',
+        connections: []
+      });
+
+      addedCount++;
+      console.log(`  ➕ Added 2 tertiary children for "${sec.label}"`);
+    }
+  });
+
+  if (addedCount > 0) {
+    console.log(`✅ Balanced structure: expanded ${addedCount} secondary branches`);
+  }
+
+  return expandedConcepts;
+}
+
+/**
+ * Generate aspect labels for a secondary concept
+ */
+function getSecondaryAspects(label) {
+  // Generate two logical aspects/sub-topics for a concept
+  const aspects = {
+    'Benefits': ['Key Advantages', 'Impact'],
+    'Deployment': ['Implementation', 'Setup'],
+    'Performance': ['Speed', 'Efficiency'],
+    'User Experience': ['Usability', 'Accessibility'],
+    'Features': ['Core Features', 'Advanced Features'],
+    'Integration': ['API Integration', 'Tool Support'],
+    'Security': ['Protection', 'Compliance'],
+    'Architecture': ['Structure', 'Design'],
+    'Development': ['Process', 'Tools'],
+    'Testing': ['Methods', 'Coverage'],
+  };
+
+  // Try to match keywords
+  for (const [key, values] of Object.entries(aspects)) {
+    if (label.toLowerCase().includes(key.toLowerCase())) {
+      return values;
+    }
+  }
+
+  // Default aspects
+  return ['Key Points', 'Details'];
+}
+
+/**
+ * Get persona-specific mindmap creation instructions
+ */
+function getPersonaMindmapInstructions(persona) {
+  const instructions = {
+    architect: `As an architect, build the mindmap with clear structural hierarchy. Think of the main concept as the foundation, secondary concepts as supporting pillars, and tertiary concepts as detailed architectural elements. Ensure clean, logical organization.`,
+
+    strategist: `As a strategist, identify the core strategic goal as the main concept. Secondary concepts should be key strategic pillars. Show how different elements connect to achieve the overall strategy. Focus on relationships and dependencies.`,
+
+    analyst: `As an analyst, identify the central data point or key finding as the main concept. Break it down into analytical categories (secondary), then specific metrics or insights (tertiary). Be precise and data-focused.`,
+
+    researcher: `As a researcher, identify the main research question or topic. Secondary concepts should be major areas of investigation. Tertiary concepts should be specific findings or sub-questions. Show thorough coverage.`,
+
+    mentor: `As a mentor, identify the core learning concept. Secondary concepts should be foundational learning pillars that build understanding. Tertiary concepts should be practical examples or stepping stones. Make it easy to follow.`
+  };
+
+  return instructions[persona] || instructions.architect;
+}
+
+/**
+ * Validate concepts structure and remove duplicates
+ */
+function validateAndCleanConcepts(concepts, maxConcepts) {
+  if (!Array.isArray(concepts)) return [];
+
+  // Track seen labels to avoid duplicates
+  const seenLabels = new Set();
+  const seenIds = new Set();
+  const validConcepts = [];
+
+  // Ensure we have exactly one main concept
+  let mainCount = 0;
+
+  for (const concept of concepts) {
+    // Validate required fields
+    if (!concept.id || !concept.label || !concept.type) {
+      console.warn('⚠️ Skipping invalid concept:', concept);
+      continue;
+    }
+
+    // Normalize label (trim, lowercase for comparison)
+    const normalizedLabel = concept.label.trim().toLowerCase();
+
+    // Skip duplicates
+    if (seenLabels.has(normalizedLabel) || seenIds.has(concept.id)) {
+      console.warn('⚠️ Skipping duplicate:', concept.label);
+      continue;
+    }
+
+    // Count main concepts
+    if (concept.type === 'main') {
+      mainCount++;
+      if (mainCount > 1) {
+        console.warn('⚠️ Multiple main concepts found, converting to secondary:', concept.label);
+        concept.type = 'secondary';
+      }
+    }
+
+    // Ensure connections is an array
+    if (!Array.isArray(concept.connections)) {
+      concept.connections = [];
+    }
+
+    // Add to valid list
+    seenLabels.add(normalizedLabel);
+    seenIds.add(concept.id);
+    validConcepts.push({
+      id: concept.id,
+      label: concept.label.trim(),
+      type: concept.type,
+      connections: concept.connections
+    });
+
+    // Stop if we reach max
+    if (validConcepts.length >= maxConcepts) break;
+  }
+
+  // If no main concept, promote the first one
+  if (mainCount === 0 && validConcepts.length > 0) {
+    console.log('⚠️ No main concept found, promoting first concept');
+    validConcepts[0].type = 'main';
+  }
+
+  console.log(`✅ Validated ${validConcepts.length} unique concepts (${mainCount} main)`);
+  return validConcepts;
+}
+
+/**
+ * Explain a specific concept in detail using AI
+ * Used for node detail popovers in mindmaps
+ */
+export async function explainConcept(conceptLabel, contextText = '', options = {}) {
+  const { persona = 'mentor', maxLength = 300 } = options;
+
+  console.log('📖 explainConcept called for:', conceptLabel);
+
+  // Build a focused prompt for explaining this specific concept
+  const prompt = `Explain the concept "${conceptLabel}" in a clear, concise way.
+
+Use the following context to make your explanation relevant and specific:
+
+${contextText.substring(0, 2000)}
+
+INSTRUCTIONS:
+- Keep explanation to 2-3 sentences (${maxLength} chars max)
+- Be clear and accessible
+- Focus on why this concept matters
+- Connect it to the broader context if possible
+- Avoid jargon unless necessary
+
+Explain "${conceptLabel}":`;
+
+  try {
+    const result = await queryLanguageModel(prompt, {
+      persona,
+      maxTokens: 500,
+      temperature: 0.7
+    });
+
+    if (result && result.response) {
+      let explanation = result.response.trim();
+
+      // Remove any prompt echoing
+      explanation = explanation.replace(new RegExp(`^Explain[^:]*:\\s*`, 'i'), '');
+      explanation = explanation.replace(new RegExp(`^"${conceptLabel}"[^:]*:\\s*`, 'i'), '');
+
+      // Truncate if too long
+      if (explanation.length > maxLength) {
+        explanation = explanation.substring(0, maxLength).trim() + '...';
+      }
+
+      return {
+        success: true,
+        explanation,
+        method: result.method
+      };
+    }
+  } catch (error) {
+    console.error('❌ Failed to explain concept:', error);
+  }
+
+  // Fallback explanation
+  return {
+    success: true,
+    explanation: `"${conceptLabel}" is a key concept in this content. It relates to the main themes and ideas discussed in the text.`,
+    method: 'fallback'
+  };
 }
 
 /**
@@ -485,39 +846,47 @@ async function mockExtractConcepts(text, options = {}) {
 
   console.log('📝 Extracted concept candidates:', selectedConcepts);
 
-  // Create mindmap nodes with meaningful connections
-  const concepts = selectedConcepts.map((word, index) => {
-    // Main concept is the first one, secondary/tertiary for variety
-    let type = 'secondary';
-    if (index === 0) type = 'main';
-    else if (index % 3 === 0) type = 'tertiary';
+  // Create mindmap nodes with PARENT → CHILD connections only
+  // Structure: 1 main → 2-3 secondary → 2-3 tertiary each
+  const concepts = [];
 
-    // Create better connections:
-    // - First node (main) connects to multiple concepts
-    // - Other nodes connect to neighbors
-    const connections = [];
-    if (index === 0) {
-      // Main concept connects to first 3 secondary concepts
-      for (let i = 1; i < Math.min(4, selectedConcepts.length); i++) {
+  // Determine node types based on index
+  const mainIndex = 0;
+  const secondaryCount = Math.min(3, Math.floor((selectedConcepts.length - 1) / 2));
+  const secondaryIndices = Array.from({ length: secondaryCount }, (_, i) => i + 1);
+
+  selectedConcepts.forEach((word, index) => {
+    let type = 'tertiary';
+    let connections = [];
+
+    if (index === mainIndex) {
+      // Main concept - connects to all secondary
+      type = 'main';
+      connections = secondaryIndices.map(i => `concept-${i}`);
+    } else if (index <= secondaryCount) {
+      // Secondary concept - connects to its tertiary children
+      type = 'secondary';
+      // Find tertiary children (concepts after all secondary)
+      const tertiaryStartIndex = secondaryCount + 1;
+      const childrenPerSecondary = Math.floor((selectedConcepts.length - tertiaryStartIndex) / secondaryCount);
+      const childStartIndex = tertiaryStartIndex + (index - 1) * childrenPerSecondary;
+      const childEndIndex = Math.min(childStartIndex + childrenPerSecondary, selectedConcepts.length);
+
+      for (let i = childStartIndex; i < childEndIndex; i++) {
         connections.push(`concept-${i}`);
       }
     } else {
-      // Connect to next concept
-      if (index < selectedConcepts.length - 1) {
-        connections.push(`concept-${index + 1}`);
-      }
-      // Some concepts also connect back to main
-      if (index > 0 && index % 2 === 0) {
-        connections.push('concept-0');
-      }
+      // Tertiary concept - leaf node, no children
+      type = 'tertiary';
+      connections = [];
     }
 
-    return {
+    concepts.push({
       id: `concept-${index}`,
       label: word.charAt(0).toUpperCase() + word.slice(1).toLowerCase(),
       type,
       connections
-    };
+    });
   });
 
   console.log('🎯 Generated mock concepts:', concepts);

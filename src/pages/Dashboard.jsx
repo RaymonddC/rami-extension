@@ -9,6 +9,7 @@ import StoryboardView from '../components/StoryboardView';
 import PromptChainEditor from '../components/PromptChainEditor';
 import HighlightNotes from '../components/HighlightNotes';
 import PersonaSelector from '../components/PersonaSelector';
+import NodeDetailPopover from '../components/NodeDetailPopover';
 import { extractConcepts } from '../utils/summarize';
 
 export default function Dashboard() {
@@ -18,6 +19,7 @@ export default function Dashboard() {
   const [selectedReading, setSelectedReading] = useState(null);
   const [concepts, setConcepts] = useState([]);
   const [viewMode, setViewMode] = useState(preferences?.mindmapMode || 'reactflow');
+  const [selectedNode, setSelectedNode] = useState(null);
 
   const handleDeleteReading = async (readingId, event) => {
     event.stopPropagation(); // Prevent selecting the reading when clicking delete
@@ -73,7 +75,7 @@ export default function Dashboard() {
   const handleGenerateMindmap = async () => {
     // Use selected reading or fall back to first available reading
     const readingToUse = selectedReading || readings[0];
-    
+
     if (!readingToUse) {
       console.log('❌ No readings available for mindmap generation');
       return;
@@ -81,7 +83,7 @@ export default function Dashboard() {
 
     console.log('🧠 Generating mindmap for:', readingToUse.title);
     console.log('📝 Content length:', (readingToUse.content || readingToUse.text || '').length);
-    
+
     const result = await extractConcepts(readingToUse.content || readingToUse.text, {
       persona: preferences?.persona,
     });
@@ -94,6 +96,17 @@ export default function Dashboard() {
     } else {
       console.error('❌ Failed to extract concepts:', result);
     }
+  };
+
+  // Handle node click to show details
+  const handleNodeClick = (concept) => {
+    console.log('🖱️ Node clicked:', concept);
+    setSelectedNode(concept);
+  };
+
+  // Close node detail popover
+  const handleCloseNodeDetail = () => {
+    setSelectedNode(null);
   };
 
   const tabs = [
@@ -237,7 +250,7 @@ export default function Dashboard() {
                     hasReadings={readings.length > 0}
                   />
                 ) : viewMode === 'reactflow' ? (
-                  <MindmapView concepts={concepts} />
+                  <MindmapView concepts={concepts} onNodeClick={handleNodeClick} />
                 ) : viewMode === 'mermaid' ? (
                   <MermaidView concepts={concepts} />
                 ) : (
@@ -272,6 +285,15 @@ export default function Dashboard() {
           )}
         </AnimatePresence>
       </main>
+
+      {/* Node Detail Popover */}
+      {selectedNode && (
+        <NodeDetailPopover
+          concept={selectedNode}
+          originalText={selectedReading?.content || selectedReading?.text || ''}
+          onClose={handleCloseNodeDetail}
+        />
+      )}
     </div>
   );
 }
