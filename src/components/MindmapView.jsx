@@ -21,7 +21,11 @@ export default function MindmapView({ concepts = [], onNodeClick, editable = tru
 
   // Convert concepts to React Flow nodes and edges
   useEffect(() => {
-    if (!concepts || concepts.length === 0) return;
+    console.log('🎯 MindmapView received concepts:', concepts);
+    if (!concepts || concepts.length === 0) {
+      console.log('⚠️ No concepts to display in mindmap');
+      return;
+    }
 
     const newNodes = concepts.map((concept, index) => {
       const angle = (index / concepts.length) * 2 * Math.PI;
@@ -44,7 +48,7 @@ export default function MindmapView({ concepts = [], onNodeClick, editable = tru
 
     const newEdges = [];
     concepts.forEach((concept) => {
-      if (concept.connections) {
+      if (concept.connections && concept.connections.length > 0) {
         concept.connections.forEach((targetId) => {
           newEdges.push({
             id: `${concept.id}-${targetId}`,
@@ -52,15 +56,20 @@ export default function MindmapView({ concepts = [], onNodeClick, editable = tru
             target: targetId,
             type: 'smoothstep',
             animated: true,
+            style: { stroke: '#f97316', strokeWidth: 2 },
             markerEnd: {
               type: MarkerType.ArrowClosed,
               width: 20,
               height: 20,
+              color: '#f97316',
             },
           });
         });
       }
     });
+
+    console.log('🔗 Created edges:', newEdges);
+    console.log('📊 Total nodes:', newNodes.length, 'Total edges:', newEdges.length);
 
     setNodes(newNodes);
     setEdges(newEdges);
@@ -144,7 +153,7 @@ function CustomNode({ data }) {
 /**
  * Empty State Component
  */
-export function MindmapEmptyState({ onGenerate }) {
+export function MindmapEmptyState({ onGenerate, hasReadings = true }) {
   return (
     <div className="w-full h-full flex items-center justify-center bg-neutral-50 dark:bg-neutral-900 rounded-xl">
       <div className="text-center max-w-md p-8">
@@ -152,13 +161,29 @@ export function MindmapEmptyState({ onGenerate }) {
         <h3 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
           No Mindmap Yet
         </h3>
-        <p className="text-neutral-600 dark:text-neutral-400 mb-6">
-          Generate a mindmap from your reading to visualize key concepts and their connections.
-        </p>
-        {onGenerate && (
-          <button onClick={onGenerate} className="btn-primary">
-            Generate Mindmap
-          </button>
+        {hasReadings ? (
+          <>
+            <p className="text-neutral-600 dark:text-neutral-400 mb-6">
+              Generate a mindmap from your reading to visualize key concepts and their connections.
+            </p>
+            {onGenerate && (
+              <button onClick={onGenerate} className="btn-primary">
+                Generate Mindmap
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="text-neutral-600 dark:text-neutral-400 mb-6">
+              Save some pages from the web first, then come back to generate a mindmap.
+            </p>
+            <button 
+              onClick={() => window.location.href = '#readings'} 
+              className="btn-primary"
+            >
+              Go to Readings
+            </button>
+          </>
         )}
       </div>
     </div>

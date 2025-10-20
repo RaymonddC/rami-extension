@@ -10,9 +10,10 @@ import {
   Loader2,
   Copy,
   CheckCircle,
+  Network,
 } from 'lucide-react';
 import { usePreferences, useSavedReadings } from '../hooks/useChromeStorage';
-import { PERSONAS, summarizeText } from '../utils/summarize';
+import { PERSONAS, summarizeText, extractConcepts } from '../utils/summarize';
 
 /**
  * Check if a method is an AI-based method
@@ -31,6 +32,8 @@ export default function Popup() {
   const [currentTab, setCurrentTab] = useState(null);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [loadingMindmap, setLoadingMindmap] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -77,7 +80,7 @@ export default function Popup() {
   const summarizePage = async () => {
     if (!currentTab) return;
 
-    setLoading(true);
+    setLoadingSummary(true);
     setShowSummary(true);
     setSummary(null);
 
@@ -87,7 +90,7 @@ export default function Popup() {
         target: { tabId: currentTab.id },
         func: () => {
           const article = document.querySelector('article') || document.body;
-          return article.innerText.substring(0, 5000); // Get first 5000 chars
+          return article.innerText.substring(0, 50000); // Get first 50000 chars
         },
       });
 
@@ -108,7 +111,7 @@ export default function Popup() {
         method: 'error'
       });
     } finally {
-      setLoading(false);
+      setLoadingSummary(false);
     }
   };
 
@@ -117,6 +120,104 @@ export default function Popup() {
       await navigator.clipboard.writeText(summary.summary);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const generateMindmap = async () => {
+    console.log('🧠 =========================');
+    console.log('🧠 Generate Mindmap button clicked');
+    console.log('🧠 =========================');
+
+    if (!currentTab) {
+      console.error('❌ No current tab available');
+      alert('Cannot access current page. Please try again.');
+      return;
+    }
+
+    console.log('📍 Current tab:', currentTab.url);
+    setLoadingMindmap(true);
+
+    try {
+      // Get page content
+      console.log('📄 Extracting page content...');
+      const [result] = await chrome.scripting.executeScript({
+        target: { tabId: currentTab.id },
+        func: () => {
+          const article = document.querySelector('article') || document.body;
+          return {
+            text: article.innerText.substring(0, 50000),
+            title: document.title
+          };
+        },
+      });
+
+      const pageContent = result.result;
+      console.log('✅ Page content extracted:', {
+        title: pageContent.title,
+        textLength: pageContent.text.length
+      });
+
+      // Extract concepts
+      console.log('🔍 Extracting concepts...');
+      const conceptResult = await extractConcepts(pageContent.text, {
+        persona: preferences?.persona || 'architect',
+        maxConcepts: 8,
+      });
+
+      console.log('📊 Concept extraction result:', {
+        success: conceptResult.success,
+        conceptCount: conceptResult.concepts?.length || 0,
+        method: conceptResult.method
+      });
+
+      if (conceptResult.success && conceptResult.concepts && conceptResult.concepts.length > 0) {
+        // Show indicator if using fallback
+        if (conceptResult.method === 'fallback') {
+          console.warn('⚠️ Using fallback concept extraction (AI not available or timed out)');
+        } else {
+          console.log('✅ Using AI-generated concepts');
+        }
+
+        // Save reading with concepts and method info
+        const reading = {
+          title: pageContent.title,
+          url: currentTab.url,
+          content: pageContent.text,
+          timestamp: new Date().toISOString(),
+          concepts: conceptResult.concepts,
+          generationMethod: conceptResult.method, // Track how it was generated
+          usedAI: conceptResult.method !== 'fallback',
+        };
+
+        console.log('💾 Saving reading with', reading.concepts.length, 'concepts...');
+        console.log('🏷️ Generation method:', conceptResult.method);
+        const saveResponse = await chrome.runtime.sendMessage({
+          action: 'save-reading',
+          data: reading,
+        });
+
+        console.log('✅ Reading saved:', saveResponse);
+
+        // Show notification based on method
+        if (conceptResult.method === 'fallback') {
+          console.log('📢 Showing fallback notification to user');
+        }
+
+        // Open dashboard with mindmap tab
+        console.log('🚀 Opening dashboard on mindmap tab...');
+        chrome.tabs.create({
+          url: chrome.runtime.getURL('dashboard.html') + '#mindmap',
+        });
+      } else {
+        console.error('❌ No concepts generated:', conceptResult);
+        alert('Failed to generate mindmap. No concepts could be extracted from the page.');
+      }
+    } catch (error) {
+      console.error('💥 Mindmap generation error:', error);
+      alert('Failed to generate mindmap: ' + error.message);
+    } finally {
+      setLoadingMindmap(false);
+      console.log('🏁 Mindmap generation flow complete');
     }
   };
 
@@ -150,7 +251,7 @@ export default function Popup() {
         {showSummary && (
           <SummaryPanel
             summary={summary}
-            loading={loading}
+            loadingSummary={loadingSummary}
             onClose={() => setShowSummary(false)}
             onCopy={copySummary}
             copied={copied}
@@ -177,10 +278,24 @@ export default function Popup() {
         />
 
         <QuickAction
-          icon={<Sparkles className="w-5 h-5" />}
+          icon={loadingSummary ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
           label="Summarize Page"
-          description="Get AI summary of current page"
+          description={loadingSummary ? "Generating summary..." : "Get AI summary of current page"}
           onClick={summarizePage}
+          disabled={loadingSummary}
+        />
+
+        <QuickAction
+          icon={loadingMindmap ? <Loader2 className="w-5 h-5 animate-spin" /> : <Network className="w-5 h-5" />}
+          label="Generate Mindmap"
+          description={loadingMindmap ? "Using AI to generate mindmap (up to 2 min)..." : "Create mindmap from current page"}
+          onClick={() => {
+            if (!loadingMindmap) {
+              console.log('🔘 Button clicked!');
+              generateMindmap();
+            }
+          }}
+          disabled={loadingMindmap}
         />
 
         <QuickAction
@@ -242,13 +357,18 @@ export default function Popup() {
 /**
  * Quick Action Button
  */
-function QuickAction({ icon, label, description, onClick }) {
+function QuickAction({ icon, label, description, onClick, disabled = false }) {
   return (
     <motion.button
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
+      whileHover={disabled ? {} : { scale: 1.02 }}
+      whileTap={disabled ? {} : { scale: 0.98 }}
       onClick={onClick}
-      className="w-full flex items-start gap-3 p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/10 transition-all text-left"
+      disabled={disabled}
+      className={`w-full flex items-start gap-3 p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 transition-all text-left ${
+        disabled
+          ? 'opacity-60 cursor-not-allowed'
+          : 'hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/10'
+      }`}
     >
       <div className="flex-shrink-0 w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center text-primary-600 dark:text-primary-400">
         {icon}
@@ -288,7 +408,7 @@ function RecentReadingItem({ reading, onClick }) {
 /**
  * Summary Panel Component
  */
-function SummaryPanel({ summary, loading, onClose, onCopy, copied, persona }) {
+function SummaryPanel({ summary, loadingSummary, onClose, onCopy, copied, persona }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: -20 }}
@@ -314,7 +434,7 @@ function SummaryPanel({ summary, loading, onClose, onCopy, copied, persona }) {
 
       {/* Summary Content */}
       <div className="flex-1 overflow-auto p-4">
-        {loading ? (
+        {loadingSummary ? (
           <div className="flex flex-col items-center justify-center h-full">
             <Loader2 className="w-8 h-8 text-primary-500 animate-spin mb-3" />
             <p className="text-sm text-neutral-600 dark:text-neutral-400">

@@ -236,14 +236,26 @@ export async function queryLanguageModel(prompt, options = {}) {
 
         if (availability === 'readily' || availability === 'available') {
           console.log('🤖 Using new LanguageModel API');
+          console.log('⏳ Creating language model session...');
           const session = await self.LanguageModel.create({
             temperature,
             topK: 3,
-            systemPrompt: personaConfig.systemPrompt
+            systemPrompt: personaConfig.systemPrompt,
+            outputLanguage: 'en'
           });
 
           const fullPrompt = `${personaConfig.promptStyle}\n\n${prompt}`;
-          const response = await session.prompt(fullPrompt);
+          console.log('⏳ Sending prompt to AI (max 2 minutes)...');
+          console.log('📝 Prompt length:', fullPrompt.length, 'characters');
+
+          const response = await Promise.race([
+            session.prompt(fullPrompt),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('AI response timeout after 120 seconds')), 120000)
+            )
+          ]);
+
+          console.log('✅ AI response received, length:', response?.length);
           await session.destroy();
 
           return {
@@ -308,6 +320,8 @@ export async function queryLanguageModel(prompt, options = {}) {
  */
 export async function extractConcepts(text, options = {}) {
   const { persona = 'architect', maxConcepts = 10 } = options;
+  
+  console.log('🔍 extractConcepts called with:', { textLength: text?.length, persona, maxConcepts });
 
   const prompt = `Analyze the following text and extract key concepts and their relationships.
 
@@ -324,25 +338,44 @@ Format your response as a JSON array of nodes with this structure:
 Text to analyze:
 ${text.substring(0, 3000)}`;
 
-  const result = await queryLanguageModel(prompt, { persona, maxTokens: 2000 });
-
   try {
-    // Parse JSON response
-    const jsonMatch = result.response.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-      const concepts = JSON.parse(jsonMatch[0]);
-      return {
-        success: true,
-        concepts: concepts.slice(0, maxConcepts),
-        method: result.method
-      };
+    const result = await queryLanguageModel(prompt, { persona, maxTokens: 2000 });
+    console.log('🤖 Language model result:', result);
+
+    if (result && result.response) {
+      // Try to parse JSON response
+      const jsonMatch = result.response.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        try {
+          const concepts = JSON.parse(jsonMatch[0]);
+          console.log('✅ Parsed concepts from AI:', concepts);
+
+          if (Array.isArray(concepts) && concepts.length > 0) {
+            return {
+              success: true,
+              concepts: concepts.slice(0, maxConcepts),
+              method: result.method
+            };
+          } else {
+            console.warn('⚠️ AI returned empty concepts array');
+          }
+        } catch (parseError) {
+          console.error('❌ Failed to parse JSON from AI:', parseError.message);
+        }
+      } else {
+        console.warn('⚠️ No JSON array found in AI response');
+        console.log('Response preview:', result.response.substring(0, 200));
+      }
     }
   } catch (error) {
-    console.error('Failed to parse concepts:', error);
+    console.error('❌ Language model query failed:', error);
   }
 
   // Fallback to mock data
-  return await mockExtractConcepts(text, options);
+  console.log('🔄 Falling back to mock concept extraction');
+  const fallbackResult = await mockExtractConcepts(text, options);
+  console.log('📊 Fallback returned:', fallbackResult.concepts.length, 'concepts');
+  return fallbackResult;
 }
 
 /**
@@ -422,24 +455,77 @@ async function mockLanguageModelResponse(prompt, options = {}) {
  * Mock concept extraction for development/testing
  */
 async function mockExtractConcepts(text, options = {}) {
+  console.log('🎭 Creating mock concepts from text length:', text?.length);
+
   // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 500));
 
-  // Extract first words as mock concepts
-  const words = text.split(/\s+/).filter(w => w.length > 4);
-  const uniqueWords = [...new Set(words)].slice(0, options.maxConcepts || 10);
+  // Extract meaningful phrases and words
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  const words = text.split(/\s+/).filter(w => w.length > 5);
 
-  const concepts = uniqueWords.map((word, index) => ({
-    id: `concept-${index}`,
-    label: word,
-    type: index === 0 ? 'main' : 'secondary',
-    connections: index < uniqueWords.length - 1 ? [`concept-${index + 1}`] : []
-  }));
+  // Get capitalized words (likely important nouns/concepts)
+  const capitalizedWords = words.filter(w => /^[A-Z]/.test(w) && w !== w.toUpperCase());
+
+  // Get frequent words (appearing more than once)
+  const wordFreq = {};
+  words.forEach(w => {
+    const lower = w.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (lower.length > 5) wordFreq[lower] = (wordFreq[lower] || 0) + 1;
+  });
+  const frequentWords = Object.entries(wordFreq)
+    .filter(([word, count]) => count > 1)
+    .sort((a, b) => b[1] - a[1])
+    .map(([word]) => word);
+
+  // Combine capitalized and frequent words, deduplicate
+  const potentialConcepts = [...new Set([...capitalizedWords.slice(0, 5), ...frequentWords.slice(0, 5)])];
+  const maxConcepts = options.maxConcepts || 8;
+  const selectedConcepts = potentialConcepts.slice(0, maxConcepts);
+
+  console.log('📝 Extracted concept candidates:', selectedConcepts);
+
+  // Create mindmap nodes with meaningful connections
+  const concepts = selectedConcepts.map((word, index) => {
+    // Main concept is the first one, secondary/tertiary for variety
+    let type = 'secondary';
+    if (index === 0) type = 'main';
+    else if (index % 3 === 0) type = 'tertiary';
+
+    // Create better connections:
+    // - First node (main) connects to multiple concepts
+    // - Other nodes connect to neighbors
+    const connections = [];
+    if (index === 0) {
+      // Main concept connects to first 3 secondary concepts
+      for (let i = 1; i < Math.min(4, selectedConcepts.length); i++) {
+        connections.push(`concept-${i}`);
+      }
+    } else {
+      // Connect to next concept
+      if (index < selectedConcepts.length - 1) {
+        connections.push(`concept-${index + 1}`);
+      }
+      // Some concepts also connect back to main
+      if (index > 0 && index % 2 === 0) {
+        connections.push('concept-0');
+      }
+    }
+
+    return {
+      id: `concept-${index}`,
+      label: word.charAt(0).toUpperCase() + word.slice(1).toLowerCase(),
+      type,
+      connections
+    };
+  });
+
+  console.log('🎯 Generated mock concepts:', concepts);
 
   return {
     success: true,
     concepts,
-    method: 'mock'
+    method: 'fallback'
   };
 }
 

@@ -88,6 +88,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           sendResponse({ success: true, data: availability });
           break;
 
+        case 'generate-mindmap':
+          const mindmapResult = await generateMindmap(request.data);
+          sendResponse(mindmapResult);
+          break;
+
+        case 'open-dashboard':
+          const tabParam = request.tab ? `#${request.tab}` : '';
+          await chrome.tabs.create({
+            url: chrome.runtime.getURL('dashboard.html') + tabParam,
+          });
+          sendResponse({ success: true });
+          break;
+
+        case 'save-highlight':
+          const highlightResult = await saveHighlight(request.data);
+          sendResponse(highlightResult);
+          break;
+
         default:
           sendResponse({ success: false, error: 'Unknown action' });
       }
@@ -281,6 +299,60 @@ function extractPageContent() {
   const excerpt = content.substring(0, 300);
 
   return { content, excerpt };
+}
+
+/**
+ * Generate mindmap from text
+ */
+async function generateMindmap(data) {
+  try {
+    const { text, title, url } = data;
+
+    // Extract concepts
+    const concepts = await extractConcepts(text, { persona: 'architect', maxConcepts: 8 });
+
+    // Save as a reading with concepts
+    const reading = {
+      id: Date.now().toString(),
+      title: title || 'Mindmap Reading',
+      url: url || '',
+      content: text,
+      timestamp: new Date().toISOString(),
+      concepts: concepts,
+    };
+
+    const { readings = [] } = await chrome.storage.local.get('readings');
+    readings.unshift(reading);
+    await chrome.storage.local.set({ readings });
+
+    return { success: true, data: { reading, concepts } };
+  } catch (error) {
+    console.error('Failed to generate mindmap:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Save a highlight
+ */
+async function saveHighlight(data) {
+  try {
+    const highlight = {
+      id: Date.now().toString(),
+      timestamp: new Date().toISOString(),
+      color: 'yellow',
+      ...data,
+    };
+
+    const { highlights = [] } = await chrome.storage.local.get('highlights');
+    highlights.push(highlight);
+    await chrome.storage.local.set({ highlights });
+
+    return { success: true, data: highlight };
+  } catch (error) {
+    console.error('Failed to save highlight:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 /**
