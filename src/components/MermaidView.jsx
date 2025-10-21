@@ -149,10 +149,9 @@ function generateMermaidCode(concepts, title) {
     code += `    ${secondary.label}\n`;
 
     // Find tertiary concepts that are children of this secondary
-    // A tertiary is a child if the secondary's connections include it
-    // AND the tertiary connects back to this secondary
+    // A tertiary is a child if the secondary's connections include the tertiary's ID
     const children = tertiaryConcepts.filter(tertiary => {
-      return tertiary.connections && tertiary.connections.includes(secondary.id);
+      return secondary.connections && secondary.connections.includes(tertiary.id);
     });
 
     // Add tertiary children
@@ -164,7 +163,7 @@ function generateMermaidCode(concepts, title) {
   // Add any orphaned tertiary concepts (not connected to any secondary)
   const orphanedTertiary = tertiaryConcepts.filter(tertiary => {
     return !secondaryConcepts.some(secondary =>
-      tertiary.connections && tertiary.connections.includes(secondary.id)
+      secondary.connections && secondary.connections.includes(tertiary.id)
     );
   });
 

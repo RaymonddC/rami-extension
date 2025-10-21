@@ -316,15 +316,111 @@ export async function queryLanguageModel(prompt, options = {}) {
 }
 
 /**
+ * Recursive text compression - keeps summarizing until text fits target length
+ * This ensures FULL page analysis regardless of original length
+ */
+async function intelligentTextCompression(text, targetLength, depth = 0) {
+  const MAX_DEPTH = 3; // Prevent infinite recursion
+
+  console.log(`${'  '.repeat(depth)}🔄 Compression level ${depth}: ${text.length} chars → target ${targetLength}`);
+
+  // Base case: text fits within target
+  if (text.length <= targetLength) {
+    console.log(`${'  '.repeat(depth)}✅ Text fits! Returning ${text.length} chars`);
+    return text;
+  }
+
+  // Safety: max recursion depth reached
+  if (depth >= MAX_DEPTH) {
+    console.log(`${'  '.repeat(depth)}⚠️ Max depth reached, truncating`);
+    return text.substring(0, targetLength);
+  }
+
+  // Recursive case: split, summarize, recurse
+  const CHUNK_SIZE = 20000;
+  const chunks = [];
+
+  // Split into chunks at paragraph boundaries when possible
+  for (let i = 0; i < text.length; i += CHUNK_SIZE) {
+    let chunkEnd = Math.min(i + CHUNK_SIZE, text.length);
+
+    // Find paragraph break near boundary
+    if (chunkEnd < text.length) {
+      const searchStart = Math.max(0, chunkEnd - 300);
+      const searchEnd = Math.min(text.length, chunkEnd + 300);
+      const segment = text.substring(searchStart, searchEnd);
+      const breakPos = segment.indexOf('\n\n');
+
+      if (breakPos !== -1) {
+        chunkEnd = searchStart + breakPos;
+      }
+    }
+
+    chunks.push(text.substring(i, chunkEnd).trim());
+  }
+
+  console.log(`${'  '.repeat(depth)}📊 Split into ${chunks.length} chunks, summarizing each...`);
+
+  // Summarize each chunk in parallel for speed
+  const summaryPromises = chunks.map(async (chunk, idx) => {
+    const result = await summarizeText(chunk, {
+      type: 'key-points',
+      length: 'medium'
+    });
+
+    if (result.success) {
+      console.log(`${'  '.repeat(depth)}  ✓ Chunk ${idx + 1}: ${chunk.length} → ${result.summary.length} chars`);
+      return result.summary;
+    } else {
+      // Fallback: extract key sentences
+      console.log(`${'  '.repeat(depth)}  ⚠ Chunk ${idx + 1}: AI failed, using fallback`);
+      return extractKeySentences(chunk, 1000);
+    }
+  });
+
+  const summaries = await Promise.all(summaryPromises);
+  const combined = summaries.join('\n\n');
+
+  console.log(`${'  '.repeat(depth)}📝 Combined summaries: ${combined.length} chars`);
+
+  // Recurse: if combined is still too long, compress again
+  return await intelligentTextCompression(combined, targetLength, depth + 1);
+}
+
+/**
+ * Fallback: extract key sentences from text
+ */
+function extractKeySentences(text, maxLength) {
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  let result = '';
+
+  for (const sentence of sentences) {
+    if (result.length + sentence.length > maxLength) break;
+    result += sentence + ' ';
+  }
+
+  return result.trim() || text.substring(0, maxLength);
+}
+
+/**
  * Extract key concepts and relationships from text for mindmap generation
  */
 export async function extractConcepts(text, options = {}) {
-  const { persona = 'architect', maxConcepts = 12 } = options;
+  const { persona = 'architect', maxConcepts = 50 } = options;
 
   console.log('🔍 extractConcepts called with:', { textLength: text?.length, persona, maxConcepts });
 
-  // Preprocess text - extract more context (up to 5000 chars)
-  const processedText = text.substring(0, 5000).trim();
+  // Smart text processing: summarize long content to fit within AI context window
+  const MAX_SAFE_LENGTH = 40000;
+  let processedText = text.trim();
+
+  if (processedText.length > MAX_SAFE_LENGTH) {
+    console.log(`📚 Text is long (${processedText.length} chars), using smart summarization to preserve full content`);
+    processedText = await intelligentTextCompression(processedText, MAX_SAFE_LENGTH);
+    console.log(`✅ Compressed to ${processedText.length} chars while preserving key information`);
+  } else {
+    console.log(`✅ Analyzing full text: ${processedText.length} characters`);
+  }
 
   // Get persona-specific instructions
   const personaConfig = PERSONAS[persona] || PERSONAS.architect;
@@ -337,13 +433,14 @@ ${personaInstructions}
 
 CRITICAL RULES:
 1. Create EXACTLY ONE "main" concept (the central topic)
-2. Create 3-5 "secondary" concepts (major branches from main topic)
-3. For complex topics: Create 2-3 "tertiary" concepts under MOST secondary branches to add depth
+2. Create 5-10 "secondary" concepts (major branches from main topic)
+3. For complex topics: Create 2-5 "tertiary" concepts under MOST secondary branches to add depth
 4. For simpler topics: You may use just 2 levels (main + secondary) if that's more natural
-5. NEVER repeat the same concept twice - each concept must be unique
-6. Keep labels concise (2-5 words maximum)
-7. Connections should form a PARENT-TO-CHILD tree structure
-8. Each concept only lists its CHILDREN in connections (not its parent)
+5. Maximum total concepts: ${maxConcepts} (aim for comprehensive coverage without redundancy)
+6. NEVER repeat the same concept twice - each concept must be unique
+7. Keep labels concise (2-5 words maximum)
+8. Connections should form a PARENT-TO-CHILD tree structure
+9. Each concept only lists its CHILDREN in connections (not its parent)
 
 STRUCTURE & CONNECTIONS:
 - Main concept (type: "main")
@@ -438,7 +535,7 @@ ${processedText}
 Remember: Return ONLY the JSON array. Connections are PARENT → CHILD only (not bidirectional). No markdown code blocks, no extra text.`;
 
   try {
-    const result = await queryLanguageModel(prompt, { persona, maxTokens: 2500 });
+    const result = await queryLanguageModel(prompt, { persona, maxTokens: 4000 });
     console.log('🤖 Language model result:', result);
 
     if (result && result.response) {
@@ -494,8 +591,8 @@ Remember: Return ONLY the JSON array. Connections are PARENT → CHILD only (not
 }
 
 /**
- * Ensure concepts have proper 3-level hierarchy
- * Only expand if we have SOME tertiary but not all secondary have children
+ * Ensure concepts have proper hierarchy structure
+ * Validates but does NOT force artificial expansion with generic labels
  */
 function ensureHierarchicalStructure(concepts) {
   if (!concepts || concepts.length === 0) return concepts;
@@ -506,88 +603,17 @@ function ensureHierarchicalStructure(concepts) {
 
   console.log(`📊 Structure check: ${main ? 1 : 0} main, ${secondary.length} secondary, ${tertiary.length} tertiary`);
 
-  // If AI generated NO tertiary at all, don't force it - maybe the content is simple
+  // Accept whatever hierarchy the AI generated
+  // Don't force expansion with generic "Key Points" / "Details" labels
+  // Quality over quantity - better to have meaningful 2-level structure than forced 3-level
+
   if (tertiary.length === 0) {
-    console.log('ℹ️ No tertiary concepts generated by AI - keeping structure as-is');
-    return concepts;
+    console.log('ℹ️ 2-level hierarchy (main + secondary) - keeping as-is');
+  } else {
+    console.log('ℹ️ 3-level hierarchy detected - keeping as-is');
   }
 
-  // If we have SOME tertiary but not all secondary have children, only expand those without
-  const expandedConcepts = [...concepts];
-  let addedCount = 0;
-
-  secondary.forEach((sec) => {
-    // Check if this secondary has any children
-    const hasChildren = tertiary.some(t =>
-      sec.connections && sec.connections.includes(t.id)
-    );
-
-    // Only expand if AI clearly intended hierarchy but missed this branch
-    if (!hasChildren && tertiary.length > 0 && addedCount < 3) {
-      // Create 2 tertiary children for this secondary
-      const child1Id = `detail-${sec.id}-1`;
-      const child2Id = `detail-${sec.id}-2`;
-
-      // Add children to secondary's connections
-      if (!sec.connections) sec.connections = [];
-      sec.connections.push(child1Id, child2Id);
-
-      // Create child concepts with more specific labels
-      const aspects = getSecondaryAspects(sec.label);
-
-      expandedConcepts.push({
-        id: child1Id,
-        label: aspects[0],
-        type: 'tertiary',
-        connections: []
-      });
-
-      expandedConcepts.push({
-        id: child2Id,
-        label: aspects[1],
-        type: 'tertiary',
-        connections: []
-      });
-
-      addedCount++;
-      console.log(`  ➕ Added 2 tertiary children for "${sec.label}"`);
-    }
-  });
-
-  if (addedCount > 0) {
-    console.log(`✅ Balanced structure: expanded ${addedCount} secondary branches`);
-  }
-
-  return expandedConcepts;
-}
-
-/**
- * Generate aspect labels for a secondary concept
- */
-function getSecondaryAspects(label) {
-  // Generate two logical aspects/sub-topics for a concept
-  const aspects = {
-    'Benefits': ['Key Advantages', 'Impact'],
-    'Deployment': ['Implementation', 'Setup'],
-    'Performance': ['Speed', 'Efficiency'],
-    'User Experience': ['Usability', 'Accessibility'],
-    'Features': ['Core Features', 'Advanced Features'],
-    'Integration': ['API Integration', 'Tool Support'],
-    'Security': ['Protection', 'Compliance'],
-    'Architecture': ['Structure', 'Design'],
-    'Development': ['Process', 'Tools'],
-    'Testing': ['Methods', 'Coverage'],
-  };
-
-  // Try to match keywords
-  for (const [key, values] of Object.entries(aspects)) {
-    if (label.toLowerCase().includes(key.toLowerCase())) {
-      return values;
-    }
-  }
-
-  // Default aspects
-  return ['Key Points', 'Details'];
+  return concepts;
 }
 
 /**
@@ -840,8 +866,8 @@ async function mockExtractConcepts(text, options = {}) {
     .map(([word]) => word);
 
   // Combine capitalized and frequent words, deduplicate
-  const potentialConcepts = [...new Set([...capitalizedWords.slice(0, 5), ...frequentWords.slice(0, 5)])];
-  const maxConcepts = options.maxConcepts || 8;
+  const potentialConcepts = [...new Set([...capitalizedWords.slice(0, 15), ...frequentWords.slice(0, 15)])];
+  const maxConcepts = options.maxConcepts || 50;
   const selectedConcepts = potentialConcepts.slice(0, maxConcepts);
 
   console.log('📝 Extracted concept candidates:', selectedConcepts);
