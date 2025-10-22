@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Map, List, Brain, FileText, LayoutGrid, Trash2 } from 'lucide-react';
+import { Map, List, Brain, FileText, LayoutGrid, Trash2, MessageCircleIcon  } from 'lucide-react';
 import { useSavedReadings, usePreferences } from '../hooks/useChromeStorage';
 import MindmapView, { MindmapEmptyState } from '../components/MindmapView';
 import MermaidView from '../components/MermaidView';
@@ -73,7 +73,7 @@ export default function Dashboard() {
   const handleGenerateMindmap = async () => {
     // Use selected reading or fall back to first available reading
     const readingToUse = selectedReading || readings[0];
-    
+
     if (!readingToUse) {
       console.log('❌ No readings available for mindmap generation');
       return;
@@ -81,7 +81,7 @@ export default function Dashboard() {
 
     console.log('🧠 Generating mindmap for:', readingToUse.title);
     console.log('📝 Content length:', (readingToUse.content || readingToUse.text || '').length);
-    
+
     const result = await extractConcepts(readingToUse.content || readingToUse.text, {
       persona: preferences?.persona,
     });
@@ -101,6 +101,7 @@ export default function Dashboard() {
     { id: 'mindmap', label: 'Mindmap', icon: <Brain className="w-4 h-4" /> },
     { id: 'storyboard', label: 'Storyboard', icon: <LayoutGrid className="w-4 h-4" /> },
     { id: 'prompts', label: 'Prompts', icon: <FileText className="w-4 h-4" /> },
+    { id: 'quiz', label: 'Quiz', icon: <MessageCircleIcon className="w-4 h-4" /> },
   ];
 
   return (
