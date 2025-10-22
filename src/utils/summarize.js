@@ -7,20 +7,20 @@
 export const PERSONAS = {
   strategist: {
     id: 'strategist',
-    name: 'The Strategist',
-    icon: '☕',
-    beverage: 'Matcha Latte',
+    name: 'Matcha',
+    icon: '🧊',
+    beverage: 'The Strategist',
     description: 'Focused, layered, intentional thinker',
     promptStyle: 'Guide me like a strategist—balanced, energizing, thoughtfully blended.',
-    systemPrompt: 'You are a strategic thinker who provides balanced, well-structured insights. Focus on connections, patterns, and actionable frameworks.',
+    systemPrompt: 'You are a strategic thinker who provides clear, balanced insights. Focus on identifying patterns, making connections, and offering practical frameworks. Structure responses as: 1) Situation Summary, 2) Key Patterns, 3) Strategic Insights, 4) Action Steps or Framework. Keep tone logical, concise, and confident.',
     tone: 'balanced',
     complexity: 'medium'
   },
   analyst: {
     id: 'analyst',
-    name: 'The Analyst',
-    icon: '🧊',
-    beverage: 'Iced Americano',
+    name: 'Coffee',
+    icon: '☕',
+    beverage: 'The Analyst',
     description: 'Crisp, direct, no-nonsense problem solver',
     promptStyle: 'Break it down like an analyst—clear, strong, efficient.',
     systemPrompt: 'You are a sharp analyst who provides clear, data-driven insights. Be direct, efficient, and focus on key findings.',
