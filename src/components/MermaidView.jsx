@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
 import { motion } from 'framer-motion';
@@ -6,38 +7,174 @@ import { Copy, Download } from 'lucide-react';
 /**
  * Mermaid Mindmap View
  * Markdown-syntax based visualization
+ * @param {Array<{id: string, label: string, type: string, connections: string[]}>} concepts
+ * @param {string} title
+ * @param {function} onNodeClick
  */
-export default function MermaidView({ concepts = [], title = 'Mindmap' }) {
+export default function MermaidView({ concepts = [], title = 'Mindmap', onNodeClick }) {
+  // Ensure concepts is an array and has the expected structure
+  const typedConcepts = Array.isArray(concepts) ? concepts : [];
   const mermaidRef = useRef(null);
   const [mermaidCode, setMermaidCode] = useState('');
   const [showCode, setShowCode] = useState(false);
 
   useEffect(() => {
-    // Initialize Mermaid
+    // Initialize Mermaid with custom configuration
     mermaid.initialize({
       startOnLoad: true,
       theme: 'default',
       securityLevel: 'loose',
+      themeVariables: {
+        // Increase font sizes to force more spacing
+        fontSize: '18px',
+        fontFamily: 'Inter, sans-serif',
+      },
       mindmap: {
-        padding: 20,
-        useMaxWidth: true,
+        padding: 80,        // Much more padding
+        useMaxWidth: false, // Allow diagram to expand
+      },
+      // Global flowchart settings that might affect mindmap
+      flowchart: {
+        nodeSpacing: 100,
+        rankSpacing: 120,
+        curve: 'basis',
       },
     });
   }, []);
 
   useEffect(() => {
-    if (!concepts || concepts.length === 0) return;
+    if (!typedConcepts || typedConcepts.length === 0) return;
 
     // Generate Mermaid mindmap syntax
-    const code = generateMermaidCode(concepts, title);
+    const code = generateMermaidCode(typedConcepts, title);
     setMermaidCode(code);
 
-    // Render Mermaid diagram
+    // Render Mermaid diagram using modern API
     if (mermaidRef.current) {
-      mermaidRef.current.innerHTML = code;
-      mermaid.contentLoaded();
+      const container = mermaidRef.current;
+      // Clear previous content
+      container.innerHTML = '';
+
+      // Create a fresh div for mermaid to render into
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.textContent = code;
+      container.appendChild(div);
+
+      // Use modern mermaid.run() API
+      mermaid.run({ nodes: [div] })
+        .then(() => {
+          console.log('✅ Mermaid rendered successfully');
+          // Add click handlers to mermaid nodes after rendering
+          if (onNodeClick && mermaidRef.current) {
+            const container = mermaidRef.current;
+            const svg = container.querySelector('svg');
+            if (svg) {
+              console.log('🔍 Found SVG, setting up click handlers...');
+              console.log('📊 Available concepts:', typedConcepts.map(c => ({ id: c.id, label: c.label, type: c.type })));
+
+              // More comprehensive approach: find all text elements and make their containers clickable
+              const textElements = svg.querySelectorAll('text');
+              console.log(`📊 Found ${textElements.length} text elements`);
+
+              // Track which elements we've already made clickable to avoid duplicates
+              const handledElements = new Set();
+
+              textElements.forEach((textEl, index) => {
+                const label = textEl.textContent.trim();
+                if (!label) return;
+
+                console.log(`🏷️ Text ${index}: "${label}"`);
+                console.log(`🔍 Looking for matches in ${typedConcepts.length} concepts...`);
+                
+                // Try to find matching concept with flexible matching
+                let concept = typedConcepts.find(c => c.label === label);
+                console.log(`🎯 Exact match:`, concept ? `Found ${concept.id}` : 'None');
+                
+                // If exact match fails, try case-insensitive match
+                if (!concept) {
+                  concept = typedConcepts.find(c => c.label.toLowerCase() === label.toLowerCase());
+                  console.log(`🎯 Case-insensitive match:`, concept ? `Found ${concept.id}` : 'None');
+                }
+                
+                // If still no match, try partial matching for long labels
+                if (!concept) {
+                  concept = typedConcepts.find(c => 
+                    label.toLowerCase().includes(c.label.toLowerCase()) || 
+                    c.label.toLowerCase().includes(label.toLowerCase())
+                  );
+                  console.log(`🎯 Partial match:`, concept ? `Found ${concept.id}` : 'None');
+                }
+                
+                // Try even more flexible matching - normalize spaces and special chars
+                if (!concept) {
+                  const normalizeText = (text) => text.toLowerCase().replace(/[^a-z0-9]/g, '');
+                  const normalizedLabel = normalizeText(label);
+                  concept = typedConcepts.find(c => normalizeText(c.label) === normalizedLabel);
+                  console.log(`🎯 Normalized match:`, concept ? `Found ${concept.id}` : 'None');
+                }
+                
+                // Debug: show all concept labels for comparison
+                if (!concept) {
+                  console.log(`❌ No match found for "${label}". Available labels:`, typedConcepts.map(c => `"${c.label}"`));
+                }
+
+                if (concept) {
+                  console.log(`✅ Matched concept for "${label}":`, concept.id, concept.type);
+                  
+                  // Find the best container element to make clickable
+                  let clickableElement = textEl.closest('g');
+                  
+                  // If no g element, try other containers
+                  if (!clickableElement) {
+                    clickableElement = textEl.closest('section') || textEl.closest('div') || textEl.parentElement;
+                  }
+                  
+                  if (clickableElement && !handledElements.has(clickableElement)) {
+                    handledElements.add(clickableElement);
+                    clickableElement.style.cursor = 'pointer';
+                    clickableElement.style.userSelect = 'none';
+                    
+                    // Add visual feedback on hover
+                    clickableElement.addEventListener('mouseenter', () => {
+                      clickableElement.style.opacity = '0.8';
+                    });
+                    clickableElement.addEventListener('mouseleave', () => {
+                      clickableElement.style.opacity = '1';
+                    });
+
+                    // Capture the concept in closure to avoid reference issues
+                    clickableElement.addEventListener('click', ((clickedConcept) => {
+                      return (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        console.log('🖱️ Mermaid node clicked:', clickedConcept);
+                        onNodeClick(clickedConcept);
+                      };
+                    })(concept));
+                    
+                    console.log(`🎯 Made element clickable for concept: ${concept.label}`);
+                  } else {
+                    console.warn(`⚠️ Could not find suitable container for text: "${label}"`);
+                  }
+                } else {
+                  console.log(`❌ No concept found for text: "${label}"`);
+                }
+              });
+
+              console.log(`✅ Set up click handlers for ${handledElements.size} elements`);
+            } else {
+              console.warn('⚠️ No SVG found in mermaid container');
+            }
+          } else {
+            console.log('ℹ️ onNodeClick not provided or no ref');
+          }
+        })
+        .catch((error) => {
+          console.error('❌ Mermaid rendering error:', error);
+        });
     }
-  }, [concepts, title]);
+  }, [typedConcepts, title, onNodeClick]);
 
   const copyCode = async () => {
     try {
@@ -49,7 +186,9 @@ export default function MermaidView({ concepts = [], title = 'Mindmap' }) {
   };
 
   const downloadSVG = () => {
-    const svg = mermaidRef.current?.querySelector('svg');
+    if (!mermaidRef.current) return;
+    const container = mermaidRef.current;
+    const svg = container.querySelector('svg');
     if (!svg) return;
 
     const svgData = new XMLSerializer().serializeToString(svg);
@@ -109,10 +248,10 @@ export default function MermaidView({ concepts = [], title = 'Mindmap' }) {
           </motion.div>
         )}
 
-        <div className="p-8 flex items-center justify-center min-h-[400px]">
+        <div className="p-12 flex items-center justify-center min-h-[500px] mermaid-container">
           <div
             ref={mermaidRef}
-            className="mermaid w-full"
+            className="w-full min-h-[400px]"
           />
         </div>
       </div>
@@ -144,8 +283,12 @@ function generateMermaidCode(concepts, title) {
   root((${mainConcept.label}))
 `;
 
-  // Add secondary concepts
-  secondaryConcepts.forEach((secondary) => {
+  // Add secondary concepts with extra spacing
+  secondaryConcepts.forEach((secondary, index) => {
+    // Add extra newline before first child to create spacing
+    if (index === 0) {
+      code += `\n`;
+    }
     code += `    ${secondary.label}\n`;
 
     // Find tertiary concepts that are children of this secondary

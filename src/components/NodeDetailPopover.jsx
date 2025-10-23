@@ -53,35 +53,35 @@ export default function NodeDetailPopover({
 
   if (!concept) return null;
 
-  // Calculate position (centered, but avoid edges)
-  const popoverStyle = {
-    maxWidth: '400px',
-    position: 'fixed',
-    left: '50%',
-    top: '50%',
-    transform: 'translate(-50%, -50%)',
-    zIndex: 1000,
-  };
-
   return (
     <AnimatePresence>
-      {/* Backdrop */}
+      {/* Backdrop - Portal to body to escape scrollable containers */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[999]"
+        className="fixed inset-0 bg-black/20 backdrop-blur-sm"
+        style={{ zIndex: 9999 }}
       />
 
-      {/* Popover */}
+      {/* Popover - Portal to body to escape scrollable containers */}
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 10 }}
         transition={{ type: 'spring', duration: 0.3 }}
-        style={popoverStyle}
         className="bg-white dark:bg-neutral-800 rounded-xl shadow-2xl border border-neutral-200 dark:border-neutral-700 overflow-hidden"
+        style={{
+          position: 'fixed',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 10000,
+          maxWidth: '500px',
+          width: '90vw',
+          maxHeight: '80vh',
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

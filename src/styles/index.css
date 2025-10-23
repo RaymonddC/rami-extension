@@ -102,6 +102,11 @@
   @apply flex justify-center items-center;
 }
 
+/* Add padding around mermaid diagrams for better spacing */
+.mermaid-container svg {
+  padding: 40px;
+}
+
 /* Selection Highlight Styles */
 .reading-highlight {
   @apply bg-yellow-200 dark:bg-yellow-900 bg-opacity-50 cursor-pointer transition-all duration-200;

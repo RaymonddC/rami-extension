@@ -65,6 +65,7 @@ export default function HybridView({ concepts = [], title = 'Mindmap', onNodeCli
             <MermaidView
               concepts={concepts}
               title={title}
+              onNodeClick={onNodeClick}
             />
           </div>
         )}
@@ -119,6 +120,7 @@ function SplitView({ concepts, title, onNodeClick }) {
             <MermaidView
               concepts={concepts}
               title={title}
+              onNodeClick={onNodeClick}
             />
           </div>
         </div>

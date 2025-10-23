@@ -243,7 +243,7 @@ export default function Dashboard() {
               )}
 
               {/* Mindmap Display */}
-              <div className="h-[calc(100vh-280px)]">
+              <div className="h-[calc(100vh-280px)] overflow-auto">
                 {concepts.length === 0 ? (
                   <MindmapEmptyState
                     onGenerate={readings.length > 0 ? handleGenerateMindmap : null}
@@ -252,9 +252,9 @@ export default function Dashboard() {
                 ) : viewMode === 'reactflow' ? (
                   <MindmapView concepts={concepts} onNodeClick={handleNodeClick} />
                 ) : viewMode === 'mermaid' ? (
-                  <MermaidView concepts={concepts} />
+                  <MermaidView concepts={concepts} onNodeClick={handleNodeClick} />
                 ) : (
-                  <HybridView concepts={concepts} />
+                  <HybridView concepts={concepts} onNodeClick={handleNodeClick} />
                 )}
               </div>
             </motion.div>
