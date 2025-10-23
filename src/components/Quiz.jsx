@@ -15,6 +15,18 @@ import {
 } from 'lucide-react';
 
 /**
+ * Shuffle array using Fisher-Yates algorithm
+ */
+function shuffleArray(array) {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+}
+
+/**
  * Quiz Component for Learning from Readings
  * Generates and manages interactive quizzes based on saved content
  */
@@ -206,7 +218,8 @@ export default function Quiz({ readings, preferences }) {
                         question={currentQuestion}
                         answer={answers[currentQuestion.id]}
                         onAnswerSelect={(answer) => handleAnswerSelect(currentQuestion.id, answer)}
-                        showFeedback={quizMode === 'practice' && answers[currentQuestion.id]}
+                        showFeedback={quizMode === 'test' && showResults}
+                        quizMode={quizMode}
                     />
                 </motion.div>
             </AnimatePresence>
@@ -266,7 +279,15 @@ export default function Quiz({ readings, preferences }) {
 /**
  * Question Card Component
  */
-function QuestionCard({ question, answer, onAnswerSelect, showFeedback }) {
+function QuestionCard({ question, answer, onAnswerSelect, showFeedback, quizMode }) {
+    // Check if answer is correct (for practice mode immediate feedback)
+    const isCorrect = answer && (
+        (question.type !== 'short-answer' && answer === question.correctAnswer) ||
+        (question.type === 'short-answer' && answer?.toLowerCase().trim() === question.correctAnswer?.toLowerCase().trim())
+    );
+
+    const showImmediateFeedback = quizMode === 'practice' && answer;
+
     return (
         <div className="space-y-6">
             {/* Question */}
@@ -297,8 +318,8 @@ function QuestionCard({ question, answer, onAnswerSelect, showFeedback }) {
                                 key={index}
                                 option={option}
                                 selected={answer === option}
-                                correct={showFeedback && option === question.correctAnswer}
-                                incorrect={showFeedback && answer === option && option !== question.correctAnswer}
+                                correct={showImmediateFeedback && option === question.correctAnswer}
+                                incorrect={showImmediateFeedback && answer === option && option !== question.correctAnswer}
                                 onClick={() => onAnswerSelect(option)}
                                 disabled={showFeedback}
                             />
@@ -311,16 +332,16 @@ function QuestionCard({ question, answer, onAnswerSelect, showFeedback }) {
                         <AnswerOption
                             option="True"
                             selected={answer === true}
-                            correct={showFeedback && question.correctAnswer === true}
-                            incorrect={showFeedback && answer === true && question.correctAnswer === false}
+                            correct={showImmediateFeedback && question.correctAnswer === true}
+                            incorrect={showImmediateFeedback && answer === true && question.correctAnswer === false}
                             onClick={() => onAnswerSelect(true)}
                             disabled={showFeedback}
                         />
                         <AnswerOption
                             option="False"
                             selected={answer === false}
-                            correct={showFeedback && question.correctAnswer === false}
-                            incorrect={showFeedback && answer === false && question.correctAnswer === true}
+                            correct={showImmediateFeedback && question.correctAnswer === false}
+                            incorrect={showImmediateFeedback && answer === false && question.correctAnswer === true}
                             onClick={() => onAnswerSelect(false)}
                             disabled={showFeedback}
                         />
@@ -339,7 +360,7 @@ function QuestionCard({ question, answer, onAnswerSelect, showFeedback }) {
             </div>
 
             {/* Feedback */}
-            {showFeedback && (
+            {(showFeedback || showImmediateFeedback) && (
                 <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -803,17 +824,20 @@ function generateFallbackQuiz(reading, questionCount = 5, providedContent = null
 
         if (i % 3 === 0) {
             // Multiple choice question
+            const correctAns = `${phrase} is discussed in detail`;
+            const options = shuffleArray([
+                correctAns,
+                'It is not mentioned',
+                'It is briefly referenced',
+                'It is the main topic',
+            ]);
+
             questions.push({
                 id: `q${i + 1}`,
                 type: 'multiple-choice',
                 question: `What is mentioned about "${phrase}"?`,
-                options: [
-                    `${phrase} is discussed in detail`,
-                    'It is not mentioned',
-                    'It is briefly referenced',
-                    'It is the main topic',
-                ],
-                correctAnswer: `${phrase} is discussed in detail`,
+                options: options,
+                correctAnswer: correctAns,
                 explanation: `The text discusses "${phrase}" as part of the main content.`,
                 hint: 'Look for key terms in the reading.',
             });
