@@ -10,12 +10,18 @@ export default function NodeDetailPopover({
   concept,
   originalText = '',
   onClose,
-  position = { x: 0, y: 0 }
+  position = { x: 0, y: 0 },
+  allConcepts = []
 }) {
   const [explanation, setExplanation] = useState('');
   const [excerpt, setExcerpt] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Helper function to find connected concept by ID
+  const findConnectedConcept = (connId) => {
+    return allConcepts.find(c => c.id === connId);
+  };
 
   useEffect(() => {
     if (!concept) return;
@@ -75,12 +81,13 @@ export default function NodeDetailPopover({
         style={{
           position: 'fixed',
           left: '50%',
-          top: '50%',
-          transform: 'translate(-50%, -50%)',
+          top: '15%',
+          transform: 'translateX(-50%)',
           zIndex: 10000,
           maxWidth: '500px',
           width: '90vw',
-          maxHeight: '80vh',
+          maxHeight: '75vh',
+          minHeight: '200px',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -111,7 +118,7 @@ export default function NodeDetailPopover({
         </div>
 
         {/* Content */}
-        <div className="p-6 max-h-[60vh] overflow-y-auto space-y-4">
+        <div className="p-6 max-h-[50vh] overflow-y-auto space-y-4">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
@@ -164,14 +171,20 @@ export default function NodeDetailPopover({
                     Connected to:
                   </h4>
                   <div className="flex flex-wrap gap-2">
-                    {concept.connections.map((connId) => (
-                      <span
-                        key={connId}
-                        className="px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full text-xs font-medium"
-                      >
-                        {connId}
-                      </span>
-                    ))}
+                    {concept.connections.map((connId) => {
+                      // Try to find the connected concept by ID to get its label
+                      const connectedConcept = findConnectedConcept(connId);
+                      const displayLabel = connectedConcept ? connectedConcept.label : connId;
+                      
+                      return (
+                        <span
+                          key={connId}
+                          className="px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full text-xs font-medium"
+                        >
+                          {displayLabel}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               )}

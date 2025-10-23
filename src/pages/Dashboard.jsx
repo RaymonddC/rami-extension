@@ -292,6 +292,7 @@ export default function Dashboard() {
           concept={selectedNode}
           originalText={selectedReading?.content || selectedReading?.text || ''}
           onClose={handleCloseNodeDetail}
+          allConcepts={concepts}
         />
       )}
     </div>

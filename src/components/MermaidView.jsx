@@ -73,18 +73,22 @@ export default function MermaidView({ concepts = [], title = 'Mindmap', onNodeCl
               console.log('🔍 Found SVG, setting up click handlers...');
               console.log('📊 Available concepts:', typedConcepts.map(c => ({ id: c.id, label: c.label, type: c.type })));
 
-              // More comprehensive approach: find all text elements and make their containers clickable
-              const textElements = svg.querySelectorAll('text');
-              console.log(`📊 Found ${textElements.length} text elements`);
+              // Find all node groups (g elements) that contain text - these are the actual nodes
+              const nodeGroups = svg.querySelectorAll('g');
+              console.log(`📊 Found ${nodeGroups.length} node groups`);
 
               // Track which elements we've already made clickable to avoid duplicates
               const handledElements = new Set();
 
-              textElements.forEach((textEl, index) => {
-                const label = textEl.textContent.trim();
+              nodeGroups.forEach((nodeGroup, index) => {
+                // Find text element within this node group
+                const textElement = nodeGroup.querySelector('text');
+                if (!textElement) return;
+
+                const label = textElement.textContent.trim();
                 if (!label) return;
 
-                console.log(`🏷️ Text ${index}: "${label}"`);
+                console.log(`🏷️ Node ${index}: "${label}"`);
                 console.log(`🔍 Looking for matches in ${typedConcepts.length} concepts...`);
                 
                 // Try to find matching concept with flexible matching
@@ -122,29 +126,28 @@ export default function MermaidView({ concepts = [], title = 'Mindmap', onNodeCl
                 if (concept) {
                   console.log(`✅ Matched concept for "${label}":`, concept.id, concept.type);
                   
-                  // Find the best container element to make clickable
-                  let clickableElement = textEl.closest('g');
-                  
-                  // If no g element, try other containers
-                  if (!clickableElement) {
-                    clickableElement = textEl.closest('section') || textEl.closest('div') || textEl.parentElement;
-                  }
-                  
-                  if (clickableElement && !handledElements.has(clickableElement)) {
-                    handledElements.add(clickableElement);
-                    clickableElement.style.cursor = 'pointer';
-                    clickableElement.style.userSelect = 'none';
+                  // Make the entire node group clickable
+                  if (!handledElements.has(nodeGroup)) {
+                    handledElements.add(nodeGroup);
+                    nodeGroup.style.cursor = 'pointer';
+                    nodeGroup.style.userSelect = 'none';
                     
-                    // Add visual feedback on hover
-                    clickableElement.addEventListener('mouseenter', () => {
-                      clickableElement.style.opacity = '0.8';
+                    // Add visual feedback on hover for the entire node
+                    nodeGroup.addEventListener('mouseenter', () => {
+                      // Highlight the text element
+                      if (textElement) {
+                        textElement.style.fontWeight = 'bold';
+                      }
                     });
-                    clickableElement.addEventListener('mouseleave', () => {
-                      clickableElement.style.opacity = '1';
+                    nodeGroup.addEventListener('mouseleave', () => {
+                      // Reset text element
+                      if (textElement) {
+                        textElement.style.fontWeight = 'normal';
+                      }
                     });
 
                     // Capture the concept in closure to avoid reference issues
-                    clickableElement.addEventListener('click', ((clickedConcept) => {
+                    nodeGroup.addEventListener('click', ((clickedConcept) => {
                       return (e) => {
                         e.stopPropagation();
                         e.preventDefault();
@@ -153,9 +156,9 @@ export default function MermaidView({ concepts = [], title = 'Mindmap', onNodeCl
                       };
                     })(concept));
                     
-                    console.log(`🎯 Made element clickable for concept: ${concept.label}`);
+                    console.log(`🎯 Made entire node clickable for concept: ${concept.label}`);
                   } else {
-                    console.warn(`⚠️ Could not find suitable container for text: "${label}"`);
+                    console.log(`ℹ️ Node already handled for concept: ${concept.label}`);
                   }
                 } else {
                   console.log(`❌ No concept found for text: "${label}"`);
