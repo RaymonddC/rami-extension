@@ -406,7 +406,7 @@ function extractKeySentences(text, maxLength) {
  * Extract key concepts and relationships from text for mindmap generation
  */
 export async function extractConcepts(text, options = {}) {
-  const { persona = 'architect', maxConcepts = 50 } = options;
+  const { persona = 'architect', maxConcepts = 100 } = options;
 
   console.log('🔍 extractConcepts called with:', { textLength: text?.length, persona, maxConcepts });
 
@@ -433,14 +433,17 @@ ${personaInstructions}
 
 CRITICAL RULES:
 1. Create EXACTLY ONE "main" concept (the central topic)
-2. Create 5-10 "secondary" concepts (major branches from main topic)
+2. Create 5-12 "secondary" concepts (major branches from main topic - cover ALL important aspects)
 3. For complex topics: Create 2-5 "tertiary" concepts under MOST secondary branches to add depth
 4. For simpler topics: You may use just 2 levels (main + secondary) if that's more natural
-5. Maximum total concepts: ${maxConcepts} (aim for comprehensive coverage without redundancy)
+5. Maximum total concepts: ${maxConcepts} (aim for comprehensive coverage - use the full budget!)
 6. NEVER repeat the same concept twice - each concept must be unique
 7. Keep labels concise (2-5 words maximum)
 8. Connections should form a PARENT-TO-CHILD tree structure
 9. Each concept only lists its CHILDREN in connections (not its parent)
+10. **CRITICAL**: Every ID in a connections array MUST have a corresponding concept object in the output
+11. **CRITICAL**: Before finalizing, verify: For each ID in ANY connections array, there MUST be a matching concept object with that exact ID
+12. **CRITICAL**: If you put an ID in a connections array, you MUST create the concept object - NO EXCEPTIONS
 
 STRUCTURE & CONNECTIONS:
 - Main concept (type: "main")
@@ -529,10 +532,16 @@ EXAMPLE (showing proper 3-level hierarchy):
 
 IMPORTANT: Your output must follow this exact pattern with 3 levels!
 
+VALIDATION CHECKLIST (verify before responding):
+✓ Every ID in main concept's connections array has a matching secondary concept object
+✓ Every ID in secondary concepts' connections arrays has a matching tertiary concept object
+✓ No connection ID is "orphaned" (pointing to non-existent concept)
+✓ Each concept's ID matches exactly what's referenced in parent's connections
+
 TEXT TO ANALYZE:
 ${processedText}
 
-Remember: Return ONLY the JSON array. Connections are PARENT → CHILD only (not bidirectional). No markdown code blocks, no extra text.`;
+Remember: Return ONLY the JSON array. Connections are PARENT → CHILD only (not bidirectional). No markdown code blocks, no extra text. VERIFY all connection IDs exist as concepts!`;
 
   try {
     const result = await queryLanguageModel(prompt, { persona, maxTokens: 4000 });
@@ -697,6 +706,65 @@ function validateAndCleanConcepts(concepts, maxConcepts) {
   if (mainCount === 0 && validConcepts.length > 0) {
     console.log('⚠️ No main concept found, promoting first concept');
     validConcepts[0].type = 'main';
+  }
+
+  // Validate connections - check for orphaned connection IDs and AUTO-CREATE missing concepts
+  const validIds = new Set(validConcepts.map(c => c.id));
+  const allReferencedIds = new Set();
+  const orphanedConnections = new Map(); // Map of parentConcept -> [missing connection IDs]
+
+  validConcepts.forEach(concept => {
+    concept.connections.forEach(connId => {
+      allReferencedIds.add(connId);
+      if (!validIds.has(connId)) {
+        console.warn(`❌ ORPHANED CONNECTION: "${concept.label}" (${concept.type}) references "${connId}" which doesn't exist!`);
+        if (!orphanedConnections.has(concept)) {
+          orphanedConnections.set(concept, []);
+        }
+        orphanedConnections.get(concept).push(connId);
+      }
+    });
+  });
+
+  if (orphanedConnections.size > 0) {
+    const totalOrphaned = Array.from(orphanedConnections.values()).reduce((sum, arr) => sum + arr.length, 0);
+    console.error(`🚨 Found ${totalOrphaned} orphaned connection(s)! AI failed to create these concepts.`);
+    console.log(`📊 Valid concept IDs:`, Array.from(validIds));
+    console.log(`🔗 Referenced IDs in connections:`, Array.from(allReferencedIds));
+    console.log(`❌ Missing concepts:`, Array.from(allReferencedIds).filter(id => !validIds.has(id)));
+
+    // AUTO-CREATE missing concepts
+    console.log(`🔧 Auto-generating ${totalOrphaned} missing concept(s)...`);
+
+    orphanedConnections.forEach((missingIds, parentConcept) => {
+      missingIds.forEach(missingId => {
+        // Generate a human-readable label from the ID
+        const label = missingId
+          .split('-')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+
+        // Determine type based on parent
+        let type = 'tertiary'; // Default
+        if (parentConcept.type === 'main') {
+          type = 'secondary'; // Direct children of main are secondary
+        } else if (parentConcept.type === 'secondary') {
+          type = 'tertiary'; // Children of secondary are tertiary
+        }
+
+        const newConcept = {
+          id: missingId,
+          label: label,
+          type: type,
+          connections: []
+        };
+
+        validConcepts.push(newConcept);
+        console.log(`  ✅ Created missing concept: "${label}" (id: ${missingId}, type: ${type})`);
+      });
+    });
+
+    console.log(`✅ Auto-generation complete! Added ${totalOrphaned} concept(s).`);
   }
 
   console.log(`✅ Validated ${validConcepts.length} unique concepts (${mainCount} main)`);
