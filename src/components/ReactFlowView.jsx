@@ -7,6 +7,8 @@ import ReactFlow, {
   useEdgesState,
   addEdge,
   MarkerType,
+  Handle,
+  Position,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { motion } from 'framer-motion';
@@ -15,116 +17,47 @@ import { motion } from 'framer-motion';
  * React Flow Mindmap View
  * Interactive node-based visualization
  */
-export default function MindmapView({ concepts = [], onNodeClick, editable = true }) {
+export default function ReactFlowView({ concepts = [], onNodeClick, editable = true }) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
   // Convert concepts to React Flow nodes and edges
   useEffect(() => {
-    console.log('🎯 MindmapView received concepts:', concepts);
-    console.log('🎯 MindmapView received onNodeClick:', onNodeClick);
+    console.log('🎯 ReactFlowView received concepts:', concepts);
+    console.log('🎯 ReactFlowView received onNodeClick:', onNodeClick);
     if (!concepts || concepts.length === 0) {
       console.log('⚠️ No concepts to display in mindmap');
       return;
     }
 
-    // Hierarchical layout configuration
-    const LAYOUT_CONFIG = {
-      rootX: 500,
-      rootY: 50,
-      levelYSpacing: 200,  // Vertical spacing between levels (ADJUSTABLE!)
-      nodeXSpacing: 250,   // Horizontal spacing between siblings (ADJUSTABLE!)
-    };
+    // Circular layout - place nodes in a circle
+    const newNodes = concepts.map((concept, index) => {
+      const angle = (index / concepts.length) * 2 * Math.PI;
+      const radius = concepts.length > 1 ? 300 : 0;
 
-    const newNodes = [];
-    const mainConcept = concepts.find(c => c.type === 'main') || concepts[0];
-    const secondaryConcepts = concepts.filter(c => c.type === 'secondary');
-    const tertiaryConcepts = concepts.filter(c => c.type === 'tertiary');
-
-    // Add root node
-    newNodes.push({
-      id: mainConcept.id,
-      type: 'custom',
-      position: { x: LAYOUT_CONFIG.rootX, y: LAYOUT_CONFIG.rootY },
-      data: {
-        label: mainConcept.label,
-        type: 'main',
-      },
-    });
-
-    // Add secondary nodes (level 1) with proper spacing
-    const secondaryY = LAYOUT_CONFIG.rootY + LAYOUT_CONFIG.levelYSpacing;
-    const secondaryStartX = LAYOUT_CONFIG.rootX - ((secondaryConcepts.length - 1) * LAYOUT_CONFIG.nodeXSpacing / 2);
-
-    secondaryConcepts.forEach((concept, index) => {
-      newNodes.push({
+      return {
         id: concept.id,
         type: 'custom',
         position: {
-          x: secondaryStartX + (index * LAYOUT_CONFIG.nodeXSpacing),
-          y: secondaryY,
+          x: 400 + radius * Math.cos(angle),
+          y: 300 + radius * Math.sin(angle),
         },
         data: {
           label: concept.label,
-          type: 'secondary',
+          type: concept.type || 'secondary',
+          concept: concept, // Pass full concept data for click handling
         },
-      });
+      };
     });
 
-    // Add tertiary nodes (level 2) with spacing
-    const tertiaryY = secondaryY + LAYOUT_CONFIG.levelYSpacing;
-    secondaryConcepts.forEach((secondary) => {
-      const children = tertiaryConcepts.filter(t =>
-        secondary.connections && secondary.connections.includes(t.id)
-      );
-
-      const secondaryNode = newNodes.find(n => n.id === secondary.id);
-      const childStartX = secondaryNode.position.x - ((children.length - 1) * (LAYOUT_CONFIG.nodeXSpacing / 2) / 2);
-
-      children.forEach((child, idx) => {
-        newNodes.push({
-          id: child.id,
-          type: 'custom',
-          position: {
-            x: childStartX + (idx * (LAYOUT_CONFIG.nodeXSpacing / 2)),
-            y: tertiaryY,
-          },
-          data: {
-            label: child.label,
-            type: 'tertiary',
-          },
-        });
-      });
-    });
-
-    // Create edges for hierarchical structure
+    // Create edges from connections
     const newEdges = [];
-
-    // Main → Secondary connections
-    secondaryConcepts.forEach((secondary) => {
-      newEdges.push({
-        id: `${mainConcept.id}-${secondary.id}`,
-        source: mainConcept.id,
-        target: secondary.id,
-        type: 'smoothstep',
-        animated: true,
-        style: { stroke: '#f97316', strokeWidth: 2 },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          width: 20,
-          height: 20,
-          color: '#f97316',
-        },
-      });
-    });
-
-    // Secondary → Tertiary connections
-    secondaryConcepts.forEach((secondary) => {
-      if (secondary.connections && secondary.connections.length > 0) {
-        secondary.connections.forEach((targetId) => {
+    concepts.forEach((concept) => {
+      if (concept.connections && concept.connections.length > 0) {
+        concept.connections.forEach((targetId) => {
           newEdges.push({
-            id: `${secondary.id}-${targetId}`,
-            source: secondary.id,
+            id: `${concept.id}-${targetId}`,
+            source: concept.id,
             target: targetId,
             type: 'smoothstep',
             animated: true,
@@ -162,15 +95,11 @@ export default function MindmapView({ concepts = [], onNodeClick, editable = tru
 
   // Handle node clicks via React Flow's event system
   const handleNodeClick = useCallback((event, node) => {
-    console.log('🖱️🖱️🖱️ REACT FLOW onNodeClick FIRED! 🖱️🖱️🖱️');
-    console.log('Event:', event);
-    console.log('Node:', node);
-    console.log('🔍 onNodeClick prop:', onNodeClick);
-    console.log('📊 Available concepts:', concepts);
+    console.log('🖱️ ReactFlow node clicked:', node);
 
-    // Find the full concept data
-    const concept = concepts.find(c => c.id === node.id);
-    console.log('✅ Found concept:', concept);
+    // Get concept data from node.data (we passed it there)
+    const concept = node.data.concept;
+    console.log('✅ Concept from node data:', concept);
 
     if (concept && onNodeClick) {
       console.log('📞 Calling onNodeClick with concept:', concept);
@@ -178,7 +107,7 @@ export default function MindmapView({ concepts = [], onNodeClick, editable = tru
     } else {
       console.warn('⚠️ Cannot call onNodeClick:', { concept, onNodeClick });
     }
-  }, [concepts, onNodeClick]);
+  }, [onNodeClick]);
 
   return (
     <div className="w-full h-full bg-neutral-50 dark:bg-neutral-900 rounded-xl overflow-hidden">
@@ -189,13 +118,9 @@ export default function MindmapView({ concepts = [], onNodeClick, editable = tru
         onEdgesChange={editable ? onEdgesChange : undefined}
         onConnect={onConnect}
         onNodeClick={handleNodeClick}
-        onNodeDoubleClick={(event, node) => {
-          console.log('🖱️🖱️ DOUBLE CLICK detected!');
-          handleNodeClick(event, node);
-        }}
         nodeTypes={nodeTypes}
-        nodesDraggable={false}
-        nodesConnectable={false}
+        nodesDraggable={true}
+        nodesConnectable={true}
         elementsSelectable={true}
         panOnDrag={true}
         panOnScroll={true}
@@ -235,20 +160,12 @@ function CustomNode({ data }) {
 
   const colorClass = typeColors[data.type] || typeColors.default;
 
-  // Test click handler
-  const handleClick = (e) => {
-    console.log('🎯 Direct node click detected!', data);
-    e.stopPropagation();
-  };
-
   return (
     <motion.div
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
-      onClick={handleClick}
-      onPointerDown={(e) => console.log('👆 Pointer down on node')}
       className={`
         px-6 py-3 rounded-lg border-2 shadow-lg cursor-pointer
         transition-all duration-200
@@ -256,6 +173,28 @@ function CustomNode({ data }) {
         ${isHovered ? 'shadow-xl' : ''}
       `}
     >
+      {/* Connection handles - these appear when hovering to create connections */}
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="w-3 h-3 !bg-white border-2 border-primary-500"
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="w-3 h-3 !bg-white border-2 border-primary-500"
+      />
+      <Handle
+        type="source"
+        position={Position.Left}
+        className="w-3 h-3 !bg-white border-2 border-primary-500"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="w-3 h-3 !bg-white border-2 border-primary-500"
+      />
+
       <div className="font-medium text-sm whitespace-nowrap">
         {data.label}
       </div>
@@ -266,7 +205,7 @@ function CustomNode({ data }) {
 /**
  * Empty State Component
  */
-export function MindmapEmptyState({ onGenerate, hasReadings = true }) {
+export function ReactFlowEmptyState({ onGenerate, hasReadings = true }) {
   return (
     <div className="w-full h-full flex items-center justify-center bg-neutral-50 dark:bg-neutral-900 rounded-xl">
       <div className="text-center max-w-md p-8">

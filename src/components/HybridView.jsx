@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Layout, Code2 } from 'lucide-react';
-import MindmapView from './MindmapView';
+import ReactFlowView from './ReactFlowView';
 import MermaidView from './MermaidView';
 
 /**
@@ -53,7 +53,7 @@ export default function HybridView({ concepts = [], title = 'Mindmap', onNodeCli
 
         {activeView === 'reactflow' && (
           <div className="w-full h-full p-4">
-            <MindmapView
+            <ReactFlowView
               concepts={concepts}
               onNodeClick={onNodeClick}
             />
@@ -94,7 +94,7 @@ function SplitView({ concepts, title, onNodeClick }) {
             </h4>
           </div>
           <div className="flex-1">
-            <MindmapView
+            <ReactFlowView
               concepts={concepts}
               onNodeClick={onNodeClick}
               editable={true}

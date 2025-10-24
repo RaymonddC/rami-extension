@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Map, List, Brain, FileText, LayoutGrid, Trash2 } from 'lucide-react';
 import { useSavedReadings, usePreferences } from '../hooks/useChromeStorage';
-import MindmapView, { MindmapEmptyState } from '../components/MindmapView';
+import ReactFlowView, { ReactFlowEmptyState } from '../components/ReactFlowView';
 import MermaidView from '../components/MermaidView';
 import HybridView from '../components/HybridView';
 import StoryboardView from '../components/StoryboardView';
@@ -245,12 +245,12 @@ export default function Dashboard() {
               {/* Mindmap Display */}
               <div className="h-[calc(100vh-280px)] overflow-auto">
                 {concepts.length === 0 ? (
-                  <MindmapEmptyState
+                  <ReactFlowEmptyState
                     onGenerate={readings.length > 0 ? handleGenerateMindmap : null}
                     hasReadings={readings.length > 0}
                   />
                 ) : viewMode === 'reactflow' ? (
-                  <MindmapView concepts={concepts} onNodeClick={handleNodeClick} />
+                  <ReactFlowView concepts={concepts} onNodeClick={handleNodeClick} />
                 ) : viewMode === 'mermaid' ? (
                   <MermaidView concepts={concepts} onNodeClick={handleNodeClick} />
                 ) : (
