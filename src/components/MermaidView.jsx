@@ -1,43 +1,138 @@
+// @ts-nocheck
 import React, { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
 import { motion } from 'framer-motion';
 import { Copy, Download } from 'lucide-react';
 
+const DEBUG = false; // Set to true for verbose logging
+
+/**
+ * Normalize text for matching (removes special chars, normalizes spaces)
+ */
+function normalizeText(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /**
  * Mermaid Mindmap View
  * Markdown-syntax based visualization
+ * @param {Array<{id: string, label: string, type: string, connections: string[]}>} concepts
+ * @param {string} title
+ * @param {function} onNodeClick
  */
-export default function MermaidView({ concepts = [], title = 'Mindmap' }) {
+export default function MermaidView({ concepts = [], title = 'Mindmap', onNodeClick }) {
+  // Ensure concepts is an array and has the expected structure
+  const typedConcepts = Array.isArray(concepts) ? concepts : [];
   const mermaidRef = useRef(null);
   const [mermaidCode, setMermaidCode] = useState('');
   const [showCode, setShowCode] = useState(false);
 
   useEffect(() => {
-    // Initialize Mermaid
+    // Initialize Mermaid with custom configuration
     mermaid.initialize({
       startOnLoad: true,
       theme: 'default',
       securityLevel: 'loose',
+      themeVariables: {
+        // Increase font sizes to force more spacing
+        fontSize: '18px',
+        fontFamily: 'Inter, sans-serif',
+      },
       mindmap: {
-        padding: 20,
-        useMaxWidth: true,
+        padding: 80,        // Much more padding
+        useMaxWidth: false, // Allow diagram to expand
+      },
+      // Global flowchart settings that might affect mindmap
+      flowchart: {
+        nodeSpacing: 100,
+        rankSpacing: 120,
+        curve: 'basis',
       },
     });
   }, []);
 
   useEffect(() => {
-    if (!concepts || concepts.length === 0) return;
+    if (!typedConcepts || typedConcepts.length === 0) return;
 
     // Generate Mermaid mindmap syntax
-    const code = generateMermaidCode(concepts, title);
+    const code = generateMermaidCode(typedConcepts, title);
     setMermaidCode(code);
 
-    // Render Mermaid diagram
+    // Render Mermaid diagram using modern API
     if (mermaidRef.current) {
-      mermaidRef.current.innerHTML = code;
-      mermaid.contentLoaded();
+      const container = mermaidRef.current;
+      // Clear previous content
+      container.innerHTML = '';
+
+      // Create a fresh div for mermaid to render into
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.textContent = code;
+      container.appendChild(div);
+
+      // Use modern mermaid.run() API
+      mermaid.run({ nodes: [div] })
+        .then(() => {
+          if (DEBUG) console.log('✅ Mermaid rendered successfully');
+
+          // Add click handlers to mermaid nodes after rendering
+          if (onNodeClick && mermaidRef.current) {
+            const container = mermaidRef.current;
+            const svg = container.querySelector('svg');
+            if (svg) {
+              const nodeGroups = svg.querySelectorAll('g');
+              const handledElements = new Set();
+
+              nodeGroups.forEach((nodeGroup) => {
+                const textElement = nodeGroup.querySelector('text');
+                if (!textElement) return;
+
+                const label = textElement.textContent.trim();
+                if (!label) return;
+
+                // Use normalized matching to find concept
+                const normalizedLabel = normalizeText(label);
+                const concept = typedConcepts.find(c => normalizeText(c.label) === normalizedLabel);
+
+                if (concept && !handledElements.has(nodeGroup)) {
+                  handledElements.add(nodeGroup);
+                  nodeGroup.style.cursor = 'pointer';
+                  nodeGroup.style.userSelect = 'none';
+
+                  // Add visual feedback on hover
+                  nodeGroup.addEventListener('mouseenter', () => {
+                    if (textElement) textElement.style.fontWeight = 'bold';
+                  });
+                  nodeGroup.addEventListener('mouseleave', () => {
+                    if (textElement) textElement.style.fontWeight = 'normal';
+                  });
+
+                  // Add click handler with closure
+                  nodeGroup.addEventListener('click', ((clickedConcept) => {
+                    return (e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      onNodeClick(clickedConcept);
+                    };
+                  })(concept));
+                } else if (!concept && DEBUG) {
+                  console.log(`⚠️ No match for "${label}"`);
+                }
+              });
+
+              if (DEBUG) console.log(`✅ Set up ${handledElements.size} click handlers`);
+            }
+          }
+        })
+        .catch((error) => {
+          console.error('❌ Mermaid rendering error:', error);
+        });
     }
-  }, [concepts, title]);
+  }, [typedConcepts, title, onNodeClick]);
 
   const copyCode = async () => {
     try {
@@ -49,7 +144,9 @@ export default function MermaidView({ concepts = [], title = 'Mindmap' }) {
   };
 
   const downloadSVG = () => {
-    const svg = mermaidRef.current?.querySelector('svg');
+    if (!mermaidRef.current) return;
+    const container = mermaidRef.current;
+    const svg = container.querySelector('svg');
     if (!svg) return;
 
     const svgData = new XMLSerializer().serializeToString(svg);
@@ -109,10 +206,10 @@ export default function MermaidView({ concepts = [], title = 'Mindmap' }) {
           </motion.div>
         )}
 
-        <div className="p-8 flex items-center justify-center min-h-[400px]">
+        <div className="p-12 flex items-center justify-center min-h-[500px] mermaid-container">
           <div
             ref={mermaidRef}
-            className="mermaid w-full"
+            className="w-full min-h-[400px]"
           />
         </div>
       </div>
@@ -122,6 +219,7 @@ export default function MermaidView({ concepts = [], title = 'Mindmap' }) {
 
 /**
  * Generate Mermaid mindmap syntax from concepts
+ * Uses hierarchical structure: main -> secondary -> tertiary
  */
 function generateMermaidCode(concepts, title) {
   if (!concepts || concepts.length === 0) {
@@ -132,25 +230,46 @@ function generateMermaidCode(concepts, title) {
 
   // Find the main concept
   const mainConcept = concepts.find(c => c.type === 'main') || concepts[0];
-  const otherConcepts = concepts.filter(c => c.id !== mainConcept.id);
+
+  // Get secondary concepts (direct children of main)
+  const secondaryConcepts = concepts.filter(c => c.type === 'secondary');
+
+  // Get tertiary concepts (children of secondary)
+  const tertiaryConcepts = concepts.filter(c => c.type === 'tertiary');
 
   let code = `mindmap
   root((${mainConcept.label}))
 `;
 
-  // Add connected concepts
-  otherConcepts.forEach((concept) => {
-    code += `    ${concept.label}\n`;
-
-    // Add sub-concepts if they exist
-    if (concept.connections && concept.connections.length > 0) {
-      concept.connections.forEach((connId) => {
-        const connectedConcept = concepts.find(c => c.id === connId);
-        if (connectedConcept && connectedConcept.id !== mainConcept.id) {
-          code += `      ${connectedConcept.label}\n`;
-        }
-      });
+  // Add secondary concepts with extra spacing
+  secondaryConcepts.forEach((secondary, index) => {
+    // Add extra newline before first child to create spacing
+    if (index === 0) {
+      code += `\n`;
     }
+    code += `    ${secondary.label}\n`;
+
+    // Find tertiary concepts that are children of this secondary
+    // A tertiary is a child if the secondary's connections include the tertiary's ID
+    const children = tertiaryConcepts.filter(tertiary => {
+      return secondary.connections && secondary.connections.includes(tertiary.id);
+    });
+
+    // Add tertiary children
+    children.forEach((tertiary) => {
+      code += `      ${tertiary.label}\n`;
+    });
+  });
+
+  // Add any orphaned tertiary concepts (not connected to any secondary)
+  const orphanedTertiary = tertiaryConcepts.filter(tertiary => {
+    return !secondaryConcepts.some(secondary =>
+      secondary.connections && secondary.connections.includes(tertiary.id)
+    );
+  });
+
+  orphanedTertiary.forEach((tertiary) => {
+    code += `    ${tertiary.label}\n`;
   });
 
   return code;

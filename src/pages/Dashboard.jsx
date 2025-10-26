@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Map, List, Brain, FileText, LayoutGrid, Trash2, MessageCircleIcon  } from 'lucide-react';
 import { useSavedReadings, usePreferences } from '../hooks/useChromeStorage';
-import MindmapView, { MindmapEmptyState } from '../components/MindmapView';
+import ReactFlowView, { ReactFlowEmptyState } from '../components/ReactFlowView';
 import MermaidView from '../components/MermaidView';
 import HybridView from '../components/HybridView';
 import StoryboardView from '../components/StoryboardView';
@@ -10,6 +10,7 @@ import PromptChainEditor from '../components/PromptChainEditor';
 import HighlightNotes from '../components/HighlightNotes';
 import PersonaSelector from '../components/PersonaSelector';
 import Quiz from '../components/Quiz';
+import NodeDetailPopover from '../components/NodeDetailPopover';
 import { extractConcepts } from '../utils/summarize';
 
 export default function Dashboard() {
@@ -19,6 +20,7 @@ export default function Dashboard() {
     const [selectedReading, setSelectedReading] = useState(null);
     const [concepts, setConcepts] = useState([]);
     const [viewMode, setViewMode] = useState(preferences?.mindmapMode || 'reactflow');
+    const [selectedNode, setSelectedNode] = useState(null);
 
     const handleDeleteReading = async (readingId, event) => {
         event.stopPropagation(); // Prevent selecting the reading when clicking delete
@@ -88,6 +90,7 @@ export default function Dashboard() {
         });
 
         console.log('🔍 Extract concepts result:', result);
+        
 
         if (result.success) {
             console.log('✅ Concepts extracted:', result.concepts);
@@ -95,6 +98,16 @@ export default function Dashboard() {
         } else {
             console.error('❌ Failed to extract concepts:', result);
         }
+    };
+
+        // Handle node click to show details
+    const handleNodeClick = (concept) => {
+        setSelectedNode(concept);
+    };
+
+    // Close node detail popover
+    const handleCloseNodeDetail = () => {
+        setSelectedNode(null);
     };
 
     const tabs = [
@@ -112,7 +125,7 @@ export default function Dashboard() {
                 <div className="container mx-auto px-6 py-4">
                     <div className="flex items-center justify-between mb-4">
                         <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">
-                            AI Reading Studio
+                            Rami
                         </h1>
                         <PersonaSelector
                             selectedPersona={preferences?.persona || 'strategist'}
@@ -232,18 +245,18 @@ export default function Dashboard() {
                             )}
 
                             {/* Mindmap Display */}
-                            <div className="h-[calc(100vh-280px)]">
+                            <div className="h-[calc(100vh-280px)] overflow-auto">
                                 {concepts.length === 0 ? (
-                                    <MindmapEmptyState
+                                    <ReactFlowEmptyState
                                         onGenerate={readings.length > 0 ? handleGenerateMindmap : null}
                                         hasReadings={readings.length > 0}
                                     />
                                 ) : viewMode === 'reactflow' ? (
-                                    <MindmapView concepts={concepts} />
+                                    <ReactFlowView concepts={concepts} onNodeClick={handleNodeClick} />
                                 ) : viewMode === 'mermaid' ? (
-                                    <MermaidView concepts={concepts} />
+                                    <MermaidView concepts={concepts} onNodeClick={handleNodeClick} />
                                 ) : (
-                                    <HybridView concepts={concepts} />
+                                    <HybridView concepts={concepts} onNodeClick={handleNodeClick} />
                                 )}
                             </div>
                         </motion.div>
@@ -286,6 +299,16 @@ export default function Dashboard() {
                     )}
                 </AnimatePresence>
             </main>
+
+      {/* Node Detail Popover */}
+      {selectedNode && (
+        <NodeDetailPopover
+          concept={selectedNode}
+          originalText={selectedReading?.content || selectedReading?.text || ''}
+          onClose={handleCloseNodeDetail}
+          allConcepts={concepts}
+        />
+      )}
         </div>
     );
 }

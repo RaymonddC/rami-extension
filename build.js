@@ -5,7 +5,7 @@ import { copyFileSync, mkdirSync, existsSync } from 'fs';
 const __dirname = new URL('.', import.meta.url).pathname;
 
 async function buildExtension() {
-  console.log('🔨 Building AI Reading Studio...\n');
+  console.log('🔨 Building Rami...\n');
 
   // Build React pages
   console.log('📦 Building React pages...');

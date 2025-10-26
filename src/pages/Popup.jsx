@@ -228,7 +228,7 @@ export default function Popup() {
       {/* Header */}
       <div className="bg-gradient-to-r from-primary-500 to-primary-600 p-6 text-white flex-shrink-0">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold">AI Reading Studio</h1>
+          <h1 className="text-2xl font-bold">Rami</h1>
           <button
             onClick={openOptions}
             className="p-2 hover:bg-white/20 rounded-lg transition-colors"

@@ -10,7 +10,7 @@
   if (window.aiReadingStudioInjected) return;
   window.aiReadingStudioInjected = true;
 
-  console.log('AI Reading Studio: Content script loaded');
+  console.log('Rami: Content script loaded');
 
   // State
   let isReaderMode = false;

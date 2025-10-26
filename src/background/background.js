@@ -6,7 +6,7 @@
 // Installation and updates
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
-    console.log('AI Reading Studio installed');
+    console.log('Rami installed');
 
     // Set default preferences
     chrome.storage.local.set({
@@ -29,7 +29,7 @@ chrome.runtime.onInstalled.addListener((details) => {
   // Create context menu items
   chrome.contextMenus.create({
     id: 'save-reading',
-    title: 'Save to AI Reading Studio',
+    title: 'Save to Rami',
     contexts: ['page'],
   });
 
@@ -155,7 +155,7 @@ async function saveCurrentPage(tab) {
       type: 'basic',
       iconUrl: 'icons/icon48.png',
       title: 'Reading Saved',
-      message: `"${tab.title}" has been saved to AI Reading Studio`,
+      message: `"${tab.title}" has been saved to Rami`,
     });
 
     return reading;
