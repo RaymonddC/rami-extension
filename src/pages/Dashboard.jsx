@@ -125,7 +125,7 @@ export default function Dashboard() {
                 <div className="container mx-auto px-6 py-4">
                     <div className="flex items-center justify-between mb-4">
                         <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">
-                            AI Reading Studio
+                            Rami
                         </h1>
                         <PersonaSelector
                             selectedPersona={preferences?.persona || 'strategist'}
