@@ -454,9 +454,11 @@ CRITICAL RULES:
 2. IDs: lowercase-with-hyphens format
 3. NOT EVERY secondary needs children - use empty connections [] if no sub-concepts exist
 4. ONLY create tertiary nodes if they add meaningful detail
-5. BEFORE adding an ID to connections, CREATE that concept object FIRST
-6. Every ID in ANY connections array MUST exist as a concept
-7. Verify at the end: all connection IDs have matching concepts
+5. STRICT HIERARCHY: main connects ONLY to secondary, secondary connects ONLY to tertiary
+6. NEVER skip levels - main cannot directly connect to tertiary nodes
+7. BEFORE adding an ID to connections, CREATE that concept object FIRST
+8. Every ID in ANY connections array MUST exist as a concept
+9. Verify at the end: all connection IDs exist AND follow hierarchy rules
 
 JSON OUTPUT (no markdown, no explanation):
 Example with children:
@@ -665,6 +667,44 @@ function validateAndCleanConcepts(concepts, maxConcepts, DEBUG = false) {
 
   if (orphanedCount > 0) {
     console.warn(`⚠️ Removed ${orphanedCount} orphaned connection(s) - AI listed non-existent concepts`);
+  }
+
+  // Enforce strict hierarchy: main → secondary → tertiary
+  const conceptMap = new Map(validConcepts.map(c => [c.id, c]));
+  let hierarchyViolations = 0;
+
+  validConcepts.forEach(concept => {
+    const properConnections = [];
+
+    concept.connections.forEach(connId => {
+      const child = conceptMap.get(connId);
+      if (!child) return; // Already filtered out
+
+      // Validate hierarchy rules
+      let isValid = false;
+      if (concept.type === 'main' && child.type === 'secondary') {
+        isValid = true; // Main can only connect to secondary
+      } else if (concept.type === 'secondary' && child.type === 'tertiary') {
+        isValid = true; // Secondary can only connect to tertiary
+      } else if (concept.type === 'tertiary') {
+        isValid = false; // Tertiary cannot connect to anything
+      }
+
+      if (isValid) {
+        properConnections.push(connId);
+      } else {
+        hierarchyViolations++;
+        if (DEBUG) {
+          console.warn(`  ⚠️ Removed invalid hierarchy: ${concept.type} "${concept.label}" → ${child.type} "${child.label}"`);
+        }
+      }
+    });
+
+    concept.connections = properConnections;
+  });
+
+  if (hierarchyViolations > 0) {
+    console.warn(`⚠️ Fixed ${hierarchyViolations} hierarchy violation(s) - enforcing main→secondary→tertiary structure`);
   }
 
   if (DEBUG) console.log(`✅ Validated ${validConcepts.length} unique concepts (${mainCount} main)`);
