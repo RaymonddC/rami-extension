@@ -5,13 +5,15 @@ import { useSavedReadings, usePreferences } from '../hooks/useChromeStorage';
 import ReactFlowView, { ReactFlowEmptyState } from '../components/ReactFlowView';
 import MermaidView from '../components/MermaidView';
 import HybridView from '../components/HybridView';
-import StoryboardView from '../components/StoryboardView';
-import PromptChainEditor from '../components/PromptChainEditor';
-import HighlightNotes from '../components/HighlightNotes';
 import PersonaSelector from '../components/PersonaSelector';
-import Quiz from '../components/Quiz';
 import NodeDetailPopover from '../components/NodeDetailPopover';
 import { extractConcepts } from '../utils/summarize';
+import { FEATURES } from '../config/features';
+
+// Conditionally import work-in-progress features
+import StoryboardView from '../components/StoryboardView';
+import PromptChainEditor from '../components/PromptChainEditor';
+import Quiz from '../components/Quiz';
 
 export default function Dashboard() {
     const { readings, removeReading } = useSavedReadings();
@@ -110,13 +112,16 @@ export default function Dashboard() {
         setSelectedNode(null);
     };
 
-    const tabs = [
-        { id: 'readings', label: 'Readings', icon: <List className="w-4 h-4" /> },
-        { id: 'mindmap', label: 'Mindmap', icon: <Brain className="w-4 h-4" /> },
-        { id: 'storyboard', label: 'Storyboard', icon: <LayoutGrid className="w-4 h-4" /> },
-        { id: 'prompts', label: 'Prompts', icon: <FileText className="w-4 h-4" /> },
-        { id: 'quiz', label: 'Quiz', icon: <MessageCircleIcon className="w-4 h-4" /> },
+    // Build tabs array based on feature flags
+    const allTabs = [
+        { id: 'readings', label: 'Readings', icon: <List className="w-4 h-4" />, enabled: FEATURES.readings },
+        { id: 'mindmap', label: 'Mindmap', icon: <Brain className="w-4 h-4" />, enabled: FEATURES.mindmap },
+        { id: 'storyboard', label: 'Storyboard', icon: <LayoutGrid className="w-4 h-4" />, enabled: FEATURES.storyboard },
+        { id: 'prompts', label: 'Prompts', icon: <FileText className="w-4 h-4" />, enabled: FEATURES.prompts },
+        { id: 'quiz', label: 'Quiz', icon: <MessageCircleIcon className="w-4 h-4" />, enabled: FEATURES.quiz },
     ];
+
+    const tabs = allTabs.filter(tab => tab.enabled);
 
     return (
         <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
@@ -262,7 +267,7 @@ export default function Dashboard() {
                         </motion.div>
                     )}
 
-                    {activeTab === 'storyboard' && (
+                    {FEATURES.storyboard && activeTab === 'storyboard' && (
                         <motion.div
                             key="storyboard"
                             initial={{ opacity: 0 }}
@@ -274,7 +279,7 @@ export default function Dashboard() {
                         </motion.div>
                     )}
 
-                    {activeTab === 'prompts' && (
+                    {FEATURES.prompts && activeTab === 'prompts' && (
                         <motion.div
                             key="prompts"
                             initial={{ opacity: 0 }}
@@ -286,7 +291,7 @@ export default function Dashboard() {
                         </motion.div>
                     )}
 
-                    {activeTab === 'quiz' && (
+                    {FEATURES.quiz && activeTab === 'quiz' && (
                         <motion.div
                             key="quiz"
                             initial={{ opacity: 0 }}
