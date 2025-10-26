@@ -23,31 +23,115 @@ export default function ReactFlowView({ concepts = [], onNodeClick, editable = t
 
   // Convert concepts to React Flow nodes and edges
   useEffect(() => {
-    console.log('🎯 ReactFlowView received concepts:', concepts);
-    console.log('🎯 ReactFlowView received onNodeClick:', onNodeClick);
     if (!concepts || concepts.length === 0) {
-      console.log('⚠️ No concepts to display in mindmap');
       return;
     }
 
-    // Circular layout - place nodes in a circle
-    const newNodes = concepts.map((concept, index) => {
-      const angle = (index / concepts.length) * 2 * Math.PI;
-      const radius = concepts.length > 1 ? 300 : 0;
+    // Radial tree layout - center main concept, children radiate outward
+    const mainConcepts = concepts.filter(c => c.type === 'main');
+    const secondaryConcepts = concepts.filter(c => c.type === 'secondary');
+    const tertiaryConcepts = concepts.filter(c => c.type === 'tertiary');
 
-      return {
+    const CENTER_X = 600;
+    const CENTER_Y = 400;
+    const INNER_RADIUS = 250;  // Distance from center to secondary nodes
+    const OUTER_RADIUS = 200;  // Distance from secondary to tertiary nodes
+
+    const newNodes = [];
+
+    // Position main concept(s) at the center
+    mainConcepts.forEach((concept, index) => {
+      newNodes.push({
         id: concept.id,
         type: 'custom',
         position: {
-          x: 400 + radius * Math.cos(angle),
-          y: 300 + radius * Math.sin(angle),
+          x: CENTER_X - (mainConcepts.length > 1 ? (index - 0.5) * 100 : 0),
+          y: CENTER_Y,
         },
         data: {
           label: concept.label,
-          type: concept.type || 'secondary',
-          concept: concept, // Pass full concept data for click handling
+          type: concept.type,
+          concept: concept,
         },
-      };
+      });
+    });
+
+    // Position secondary concepts in a circle around the center
+    secondaryConcepts.forEach((concept, index) => {
+      const angle = (index / secondaryConcepts.length) * 2 * Math.PI;
+
+      newNodes.push({
+        id: concept.id,
+        type: 'custom',
+        position: {
+          x: CENTER_X + INNER_RADIUS * Math.cos(angle),
+          y: CENTER_Y + INNER_RADIUS * Math.sin(angle),
+        },
+        data: {
+          label: concept.label,
+          type: concept.type,
+          concept: concept,
+          angle: angle, // Store angle for positioning children
+        },
+      });
+    });
+
+    // Position tertiary concepts around their parent secondary concepts
+    tertiaryConcepts.forEach((concept) => {
+      // Find parent secondary concept
+      const parent = secondaryConcepts.find(sec =>
+        sec.connections && sec.connections.includes(concept.id)
+      );
+
+      if (parent) {
+        const parentNode = newNodes.find(n => n.id === parent.id);
+        if (parentNode) {
+          // Get children of this parent to arrange them in an arc
+          const siblings = tertiaryConcepts.filter(t =>
+            parent.connections && parent.connections.includes(t.id)
+          );
+          const siblingIndex = siblings.findIndex(s => s.id === concept.id);
+          const totalSiblings = siblings.length;
+
+          // Calculate angle offset for this child
+          // Spread children in an arc around the parent
+          const arcSpan = Math.PI / 3; // 60 degree arc for children
+          const childAngle = parentNode.data.angle +
+            (siblingIndex - (totalSiblings - 1) / 2) * (arcSpan / Math.max(totalSiblings - 1, 1));
+
+          newNodes.push({
+            id: concept.id,
+            type: 'custom',
+            position: {
+              x: parentNode.position.x + OUTER_RADIUS * Math.cos(childAngle),
+              y: parentNode.position.y + OUTER_RADIUS * Math.sin(childAngle),
+            },
+            data: {
+              label: concept.label,
+              type: concept.type,
+              concept: concept,
+            },
+          });
+        }
+      } else {
+        // Orphan tertiary - position in outer ring at available angle
+        const orphanIndex = newNodes.filter(n => n.data.type === 'tertiary').length;
+        const angle = (orphanIndex / Math.max(tertiaryConcepts.length, 1)) * 2 * Math.PI;
+
+        newNodes.push({
+          id: concept.id,
+          type: 'custom',
+          position: {
+            x: CENTER_X + (INNER_RADIUS + OUTER_RADIUS) * Math.cos(angle),
+            y: CENTER_Y + (INNER_RADIUS + OUTER_RADIUS) * Math.sin(angle),
+          },
+          data: {
+            label: concept.label,
+            type: concept.type,
+            concept: concept,
+          },
+        });
+      }
     });
 
     // Create edges from connections
@@ -73,12 +157,9 @@ export default function ReactFlowView({ concepts = [], onNodeClick, editable = t
       }
     });
 
-    console.log('🔗 Created edges:', newEdges);
-    console.log('📊 Total nodes:', newNodes.length, 'Total edges:', newEdges.length);
-
     setNodes(newNodes);
     setEdges(newEdges);
-  }, [concepts, setNodes, setEdges, onNodeClick]);
+  }, [concepts, setNodes, setEdges]);
 
   const onConnect = useCallback(
     (params) => {
@@ -95,17 +176,9 @@ export default function ReactFlowView({ concepts = [], onNodeClick, editable = t
 
   // Handle node clicks via React Flow's event system
   const handleNodeClick = useCallback((event, node) => {
-    console.log('🖱️ ReactFlow node clicked:', node);
-
-    // Get concept data from node.data (we passed it there)
     const concept = node.data.concept;
-    console.log('✅ Concept from node data:', concept);
-
     if (concept && onNodeClick) {
-      console.log('📞 Calling onNodeClick with concept:', concept);
       onNodeClick(concept);
-    } else {
-      console.warn('⚠️ Cannot call onNodeClick:', { concept, onNodeClick });
     }
   }, [onNodeClick]);
 

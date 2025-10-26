@@ -4,6 +4,19 @@ import mermaid from 'mermaid';
 import { motion } from 'framer-motion';
 import { Copy, Download } from 'lucide-react';
 
+const DEBUG = false; // Set to true for verbose logging
+
+/**
+ * Normalize text for matching (removes special chars, normalizes spaces)
+ */
+function normalizeText(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /**
  * Mermaid Mindmap View
  * Markdown-syntax based visualization
@@ -64,113 +77,55 @@ export default function MermaidView({ concepts = [], title = 'Mindmap', onNodeCl
       // Use modern mermaid.run() API
       mermaid.run({ nodes: [div] })
         .then(() => {
-          console.log('✅ Mermaid rendered successfully');
+          if (DEBUG) console.log('✅ Mermaid rendered successfully');
+
           // Add click handlers to mermaid nodes after rendering
           if (onNodeClick && mermaidRef.current) {
             const container = mermaidRef.current;
             const svg = container.querySelector('svg');
             if (svg) {
-              console.log('🔍 Found SVG, setting up click handlers...');
-              console.log('📊 Available concepts:', typedConcepts.map(c => ({ id: c.id, label: c.label, type: c.type })));
-
-              // Find all node groups (g elements) that contain text - these are the actual nodes
               const nodeGroups = svg.querySelectorAll('g');
-              console.log(`📊 Found ${nodeGroups.length} node groups`);
-
-              // Track which elements we've already made clickable to avoid duplicates
               const handledElements = new Set();
 
-              nodeGroups.forEach((nodeGroup, index) => {
-                // Find text element within this node group
+              nodeGroups.forEach((nodeGroup) => {
                 const textElement = nodeGroup.querySelector('text');
                 if (!textElement) return;
 
                 const label = textElement.textContent.trim();
                 if (!label) return;
 
-                console.log(`🏷️ Node ${index}: "${label}"`);
-                console.log(`🔍 Looking for matches in ${typedConcepts.length} concepts...`);
-                
-                // Try to find matching concept with flexible matching
-                let concept = typedConcepts.find(c => c.label === label);
-                console.log(`🎯 Exact match:`, concept ? `Found ${concept.id}` : 'None');
-                
-                // If exact match fails, try case-insensitive match
-                if (!concept) {
-                  concept = typedConcepts.find(c => c.label.toLowerCase() === label.toLowerCase());
-                  console.log(`🎯 Case-insensitive match:`, concept ? `Found ${concept.id}` : 'None');
-                }
-                
-                // If still no match, try partial matching for long labels
-                if (!concept) {
-                  concept = typedConcepts.find(c => 
-                    label.toLowerCase().includes(c.label.toLowerCase()) || 
-                    c.label.toLowerCase().includes(label.toLowerCase())
-                  );
-                  console.log(`🎯 Partial match:`, concept ? `Found ${concept.id}` : 'None');
-                }
-                
-                // Try even more flexible matching - normalize spaces and special chars
-                if (!concept) {
-                  const normalizeText = (text) => text.toLowerCase().replace(/[^a-z0-9]/g, '');
-                  const normalizedLabel = normalizeText(label);
-                  concept = typedConcepts.find(c => normalizeText(c.label) === normalizedLabel);
-                  console.log(`🎯 Normalized match:`, concept ? `Found ${concept.id}` : 'None');
-                }
-                
-                // Debug: show all concept labels for comparison
-                if (!concept) {
-                  console.log(`❌ No match found for "${label}". Available labels:`, typedConcepts.map(c => `"${c.label}"`));
-                }
+                // Use normalized matching to find concept
+                const normalizedLabel = normalizeText(label);
+                const concept = typedConcepts.find(c => normalizeText(c.label) === normalizedLabel);
 
-                if (concept) {
-                  console.log(`✅ Matched concept for "${label}":`, concept.id, concept.type);
-                  
-                  // Make the entire node group clickable
-                  if (!handledElements.has(nodeGroup)) {
-                    handledElements.add(nodeGroup);
-                    nodeGroup.style.cursor = 'pointer';
-                    nodeGroup.style.userSelect = 'none';
-                    
-                    // Add visual feedback on hover for the entire node
-                    nodeGroup.addEventListener('mouseenter', () => {
-                      // Highlight the text element
-                      if (textElement) {
-                        textElement.style.fontWeight = 'bold';
-                      }
-                    });
-                    nodeGroup.addEventListener('mouseleave', () => {
-                      // Reset text element
-                      if (textElement) {
-                        textElement.style.fontWeight = 'normal';
-                      }
-                    });
+                if (concept && !handledElements.has(nodeGroup)) {
+                  handledElements.add(nodeGroup);
+                  nodeGroup.style.cursor = 'pointer';
+                  nodeGroup.style.userSelect = 'none';
 
-                    // Capture the concept in closure to avoid reference issues
-                    nodeGroup.addEventListener('click', ((clickedConcept) => {
-                      return (e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        console.log('🖱️ Mermaid node clicked:', clickedConcept);
-                        onNodeClick(clickedConcept);
-                      };
-                    })(concept));
-                    
-                    console.log(`🎯 Made entire node clickable for concept: ${concept.label}`);
-                  } else {
-                    console.log(`ℹ️ Node already handled for concept: ${concept.label}`);
-                  }
-                } else {
-                  console.log(`❌ No concept found for text: "${label}"`);
+                  // Add visual feedback on hover
+                  nodeGroup.addEventListener('mouseenter', () => {
+                    if (textElement) textElement.style.fontWeight = 'bold';
+                  });
+                  nodeGroup.addEventListener('mouseleave', () => {
+                    if (textElement) textElement.style.fontWeight = 'normal';
+                  });
+
+                  // Add click handler with closure
+                  nodeGroup.addEventListener('click', ((clickedConcept) => {
+                    return (e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      onNodeClick(clickedConcept);
+                    };
+                  })(concept));
+                } else if (!concept && DEBUG) {
+                  console.log(`⚠️ No match for "${label}"`);
                 }
               });
 
-              console.log(`✅ Set up click handlers for ${handledElements.size} elements`);
-            } else {
-              console.warn('⚠️ No SVG found in mermaid container');
+              if (DEBUG) console.log(`✅ Set up ${handledElements.size} click handlers`);
             }
-          } else {
-            console.log('ℹ️ onNodeClick not provided or no ref');
           }
         })
         .catch((error) => {

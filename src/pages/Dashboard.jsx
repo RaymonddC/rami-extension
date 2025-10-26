@@ -29,9 +29,6 @@ export default function Dashboard() {
     }
 
     try {
-      console.log('🗑️ Deleting reading:', readingId);
-
-      // Use the removeReading function from the hook
       await removeReading(readingId);
 
       // If deleted reading was selected, clear selection
@@ -39,8 +36,6 @@ export default function Dashboard() {
         setSelectedReading(null);
         setConcepts([]);
       }
-
-      console.log('✅ Reading deleted successfully');
     } catch (error) {
       console.error('❌ Failed to delete reading:', error);
       alert('Failed to delete reading. Please try again.');
@@ -57,16 +52,11 @@ export default function Dashboard() {
     // If we're opening to mindmap tab and have readings, load the latest one
     if (hash === 'mindmap' && readings.length > 0) {
       const latestReading = readings[0];
-      console.log('📖 Loading latest reading for mindmap:', latestReading.title);
 
       if (latestReading.concepts && latestReading.concepts.length > 0) {
-        console.log('✅ Found concepts in reading:', latestReading.concepts);
-        console.log('🏷️ Generation method:', latestReading.generationMethod || 'unknown');
-        console.log('🤖 Used AI:', latestReading.usedAI !== false ? 'Yes' : 'No');
         setConcepts(latestReading.concepts);
         setSelectedReading(latestReading);
       } else {
-        console.log('⚠️ No concepts found, will need to generate');
         setSelectedReading(latestReading);
       }
     }
@@ -77,21 +67,14 @@ export default function Dashboard() {
     const readingToUse = selectedReading || readings[0];
 
     if (!readingToUse) {
-      console.log('❌ No readings available for mindmap generation');
       return;
     }
-
-    console.log('🧠 Generating mindmap for:', readingToUse.title);
-    console.log('📝 Content length:', (readingToUse.content || readingToUse.text || '').length);
 
     const result = await extractConcepts(readingToUse.content || readingToUse.text, {
       persona: preferences?.persona,
     });
 
-    console.log('🔍 Extract concepts result:', result);
-
     if (result.success) {
-      console.log('✅ Concepts extracted:', result.concepts);
       setConcepts(result.concepts);
     } else {
       console.error('❌ Failed to extract concepts:', result);
@@ -100,7 +83,6 @@ export default function Dashboard() {
 
   // Handle node click to show details
   const handleNodeClick = (concept) => {
-    console.log('🖱️ Node clicked:', concept);
     setSelectedNode(concept);
   };
 
