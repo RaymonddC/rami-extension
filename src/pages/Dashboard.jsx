@@ -275,7 +275,7 @@ export default function Dashboard() {
                             exit={{ opacity: 0 }}
                             className="h-[calc(100vh-200px)]"
                         >
-                            <StoryboardView concepts={concepts} />
+                            <StoryboardView concepts={concepts} onNodeClick={handleNodeClick} />
                         </motion.div>
                     )}
 
