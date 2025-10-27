@@ -13,7 +13,7 @@ export const FEATURES = {
 
   // Work in progress (disabled in production)
   storyboard: true,  // Visual timeline view of concepts - needs completion
-  prompts: false,     // Custom prompt chain editor - needs completion
+  prompts: true,      // Custom prompt chain editor with execution visualization
 };
 
 /**
@@ -36,8 +36,17 @@ export const FEATURE_INFO = {
 
   prompts: {
     name: 'Prompt Chain Editor',
-    description: 'Create and manage custom AI prompt chains for advanced content analysis workflows',
-    status: 'Work in Progress',
-    reason: 'Prompt execution pipeline and storage need implementation',
+    description: 'Create and manage custom AI prompt chains for advanced content analysis workflows with real-time execution visualization',
+    status: '✅ Completed',
+    features: [
+      'Drag-and-drop step builder',
+      'Real-time execution progress bar',
+      'Status badges (waiting, running, completed, error)',
+      'Live output streaming display',
+      'Execution time tracking',
+      'Visual flow indicators showing data passing',
+      'Step types: Summarize, Extract, Visualize, Reflect',
+      'Sequential execution with context passing',
+    ],
   },
 };

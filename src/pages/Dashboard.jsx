@@ -287,7 +287,7 @@ export default function Dashboard() {
                             exit={{ opacity: 0 }}
                             className="h-[calc(100vh-200px)]"
                         >
-                            <PromptChainEditor />
+                            <PromptChainEditor preferences={preferences} readings={readings} />
                         </motion.div>
                     )}
 
