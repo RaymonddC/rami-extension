@@ -79,21 +79,21 @@ export default function HybridView({ concepts = [], title = 'Mindmap', onNodeCli
  */
 function SplitView({ concepts, title, onNodeClick }) {
   return (
-    <div className="w-full h-full grid grid-cols-1 lg:grid-cols-2 gap-4 p-4">
+    <div className="w-full h-full grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 overflow-hidden">
       {/* React Flow Side */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
-        className="h-full"
+        className="h-full overflow-hidden"
       >
         <div className="h-full flex flex-col">
-          <div className="flex items-center gap-2 mb-2 px-2">
+          <div className="flex items-center gap-2 mb-2 px-2 flex-shrink-0">
             <span className="text-2xl">🧠</span>
             <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
               Interactive Graph
             </h4>
           </div>
-          <div className="flex-1">
+          <div className="flex-1 overflow-auto">
             <ReactFlowView
               concepts={concepts}
               onNodeClick={onNodeClick}
@@ -107,16 +107,16 @@ function SplitView({ concepts, title, onNodeClick }) {
       <motion.div
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
-        className="h-full"
+        className="h-full overflow-hidden"
       >
         <div className="h-full flex flex-col">
-          <div className="flex items-center gap-2 mb-2 px-2">
+          <div className="flex items-center gap-2 mb-2 px-2 flex-shrink-0">
             <Code2 className="w-5 h-5 text-neutral-700 dark:text-neutral-300" />
             <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
               Mermaid Diagram
             </h4>
           </div>
-          <div className="flex-1">
+          <div className="flex-1 overflow-auto">
             <MermaidView
               concepts={concepts}
               title={title}
