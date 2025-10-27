@@ -15,11 +15,16 @@
   // State
   let isReaderMode = false;
   let originalContent = null;
+  let isInitialized = false;
 
   /**
    * Initialize content script
    */
   function initialize() {
+    // Prevent double initialization
+    if (isInitialized) return;
+    isInitialized = true;
+
     // Listen for messages from extension
     chrome.runtime.onMessage.addListener(handleMessage);
 
@@ -31,6 +36,32 @@
 
     // Create floating toolbar
     createFloatingToolbar();
+
+    // Clean up on page unload to prevent memory leaks
+    window.addEventListener('beforeunload', cleanup);
+  }
+
+  /**
+   * Cleanup function to remove event listeners
+   */
+  function cleanup() {
+    console.log('Rami: Cleaning up content script');
+
+    // Remove event listeners
+    document.removeEventListener('keydown', handleKeyboard);
+    document.removeEventListener('mouseup', handleSelection);
+    chrome.runtime.onMessage.removeListener(handleMessage);
+
+    // Remove toolbar if exists
+    const toolbar = document.getElementById('ai-reading-studio-toolbar');
+    if (toolbar) {
+      toolbar.remove();
+    }
+
+    // Reset state
+    isInitialized = false;
+    isReaderMode = false;
+    originalContent = null;
   }
 
   /**

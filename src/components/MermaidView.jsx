@@ -62,6 +62,9 @@ export default function MermaidView({ concepts = [], title = 'Mindmap', onNodeCl
     const code = generateMermaidCode(typedConcepts, title);
     setMermaidCode(code);
 
+    // Track event listeners for cleanup
+    const eventListeners = [];
+
     // Render Mermaid diagram using modern API
     if (mermaidRef.current) {
       const container = mermaidRef.current;
@@ -103,22 +106,40 @@ export default function MermaidView({ concepts = [], title = 'Mindmap', onNodeCl
                   nodeGroup.style.cursor = 'pointer';
                   nodeGroup.style.userSelect = 'none';
 
-                  // Add visual feedback on hover
-                  nodeGroup.addEventListener('mouseenter', () => {
+                  // Create handler functions
+                  const handleMouseEnter = () => {
                     if (textElement) textElement.style.fontWeight = 'bold';
-                  });
-                  nodeGroup.addEventListener('mouseleave', () => {
+                  };
+                  const handleMouseLeave = () => {
                     if (textElement) textElement.style.fontWeight = 'normal';
-                  });
+                  };
+                  const handleClick = (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    onNodeClick(concept);
+                  };
 
-                  // Add click handler with closure
-                  nodeGroup.addEventListener('click', ((clickedConcept) => {
-                    return (e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      onNodeClick(clickedConcept);
-                    };
-                  })(concept));
+                  // Add visual feedback on hover
+                  nodeGroup.addEventListener('mouseenter', handleMouseEnter);
+                  nodeGroup.addEventListener('mouseleave', handleMouseLeave);
+                  nodeGroup.addEventListener('click', handleClick);
+
+                  // Track for cleanup
+                  eventListeners.push({
+                    element: nodeGroup,
+                    type: 'mouseenter',
+                    handler: handleMouseEnter
+                  });
+                  eventListeners.push({
+                    element: nodeGroup,
+                    type: 'mouseleave',
+                    handler: handleMouseLeave
+                  });
+                  eventListeners.push({
+                    element: nodeGroup,
+                    type: 'click',
+                    handler: handleClick
+                  });
                 } else if (!concept && DEBUG) {
                   console.log(`⚠️ No match for "${label}"`);
                 }
@@ -132,6 +153,18 @@ export default function MermaidView({ concepts = [], title = 'Mindmap', onNodeCl
           console.error('❌ Mermaid rendering error:', error);
         });
     }
+
+    // Cleanup function - remove all event listeners
+    return () => {
+      eventListeners.forEach(({ element, type, handler }) => {
+        if (element && element.removeEventListener) {
+          element.removeEventListener(type, handler);
+        }
+      });
+      if (DEBUG && eventListeners.length > 0) {
+        console.log(`🧹 Cleaned up ${eventListeners.length} Mermaid event listeners`);
+      }
+    };
   }, [typedConcepts, title, onNodeClick]);
 
   const copyCode = async () => {

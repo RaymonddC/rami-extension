@@ -27,7 +27,11 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": ["http://*/*", "https://*/*"],
+      "exclude_matches": [
+        "*://chrome.google.com/*",
+        "*://chromewebstore.google.com/*"
+      ],
       "js": ["src/content/reader.js"],
       "css": ["src/content/reader.css"]
     }

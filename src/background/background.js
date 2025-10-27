@@ -3,6 +3,10 @@
  * Handles Chrome extension background tasks
  */
 
+// Configuration constants
+const MAX_READINGS = 500; // Limit readings to prevent storage quota issues (Chrome has 10MB limit)
+const MAX_HIGHLIGHTS = 1000; // Limit highlights
+
 // Installation and updates
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
@@ -145,9 +149,16 @@ async function saveCurrentPage(tab) {
       timestamp: new Date().toISOString(),
     };
 
-    // Save to storage
+    // Save to storage with size limit
     const { readings = [] } = await chrome.storage.local.get('readings');
     readings.unshift(reading);
+
+    // Enforce size limit to prevent storage quota issues
+    if (readings.length > MAX_READINGS) {
+      const removed = readings.splice(MAX_READINGS);
+      console.log(`⚠️ Removed ${removed.length} old readings (limit: ${MAX_READINGS})`);
+    }
+
     await chrome.storage.local.set({ readings });
 
     // Show notification
@@ -177,6 +188,13 @@ async function saveReading(data) {
 
   const { readings = [] } = await chrome.storage.local.get('readings');
   readings.unshift(reading);
+
+  // Enforce size limit
+  if (readings.length > MAX_READINGS) {
+    const removed = readings.splice(MAX_READINGS);
+    console.log(`⚠️ Removed ${removed.length} old readings (limit: ${MAX_READINGS})`);
+  }
+
   await chrome.storage.local.set({ readings });
 
   return reading;
@@ -197,6 +215,13 @@ async function highlightSelection(info, tab) {
 
     const { highlights = [] } = await chrome.storage.local.get('highlights');
     highlights.push(highlight);
+
+    // Enforce size limit
+    if (highlights.length > MAX_HIGHLIGHTS) {
+      const removed = highlights.splice(0, highlights.length - MAX_HIGHLIGHTS);
+      console.log(`⚠️ Removed ${removed.length} old highlights (limit: ${MAX_HIGHLIGHTS})`);
+    }
+
     await chrome.storage.local.set({ highlights });
 
     // Inject content script to visually highlight

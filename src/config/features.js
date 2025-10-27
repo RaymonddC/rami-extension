@@ -12,7 +12,7 @@ export const FEATURES = {
   quiz: true,
 
   // Work in progress (disabled in production)
-  storyboard: true,  // Visual timeline view of concepts - needs completion
+  storyboard: false,  // Visual timeline view of concepts - needs completion
   prompts: true,      // Custom prompt chain editor with execution visualization
 };
 

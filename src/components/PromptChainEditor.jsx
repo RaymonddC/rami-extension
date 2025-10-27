@@ -21,6 +21,10 @@ import { queryLanguageModel } from '../utils/summarize';
  * Prompt Chain Editor
  * Visual tool for building multi-step reasoning flows
  */
+// Configuration constants
+const MAX_CHAIN_STEPS = 20; // Prevent excessively long chains
+const MAX_EXECUTION_TIME_MS = 10 * 60 * 1000; // 10 minutes total timeout
+
 export default function PromptChainEditor({ chain = [], onChange, onExecute, preferences = {}, readings = [] }) {
   const [steps, setSteps] = useState(chain);
   const [executionState, setExecutionState] = useState('idle'); // idle, running, completed, error
@@ -36,6 +40,12 @@ export default function PromptChainEditor({ chain = [], onChange, onExecute, pre
   }, [readings, selectedReadingId]);
 
   const handleAddStep = (type) => {
+    // Enforce maximum step limit
+    if (steps.length >= MAX_CHAIN_STEPS) {
+      alert(`Maximum ${MAX_CHAIN_STEPS} steps allowed. Please remove some steps before adding more.`);
+      return;
+    }
+
     const newStep = {
       id: `step-${Date.now()}`,
       type,
@@ -91,6 +101,9 @@ export default function PromptChainEditor({ chain = [], onChange, onExecute, pre
     }));
     setSteps(resetSteps);
 
+    // Track execution start time for timeout
+    const executionStartTime = Date.now();
+
     try {
       // Start with the reading content as initial context
       let previousOutput = selectedReading
@@ -99,6 +112,11 @@ export default function PromptChainEditor({ chain = [], onChange, onExecute, pre
 
       // Execute each step sequentially
       for (let i = 0; i < resetSteps.length; i++) {
+        // Check for timeout
+        const elapsedTime = Date.now() - executionStartTime;
+        if (elapsedTime > MAX_EXECUTION_TIME_MS) {
+          throw new Error(`Chain execution timeout after ${MAX_EXECUTION_TIME_MS / 60000} minutes`);
+        }
         setCurrentStepIndex(i);
         const step = resetSteps[i];
 
