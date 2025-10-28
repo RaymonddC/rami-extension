@@ -3,6 +3,9 @@
  * Handles Chrome extension background tasks
  */
 
+// Import AI utilities
+import { summarizeText } from '../utils/summarize.js';
+
 // Configuration constants
 const MAX_READINGS = 100; // Limit readings to prevent storage quota issues (Chrome has 10MB limit)
 const MAX_HIGHLIGHTS = 1000; // Limit highlights
@@ -68,7 +71,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           break;
 
         case 'summarize':
+          console.log('📨 Background: Received summarize request');
           const summary = await performSummarization(request.text, request.options);
+          console.log('📤 Background: Sending response with summary length:', summary?.length);
           sendResponse({ success: true, data: summary });
           break;
 
@@ -280,13 +285,50 @@ async function checkAIStatus() {
 }
 
 /**
- * Perform summarization (mock implementation)
+ * Perform summarization using AI
  */
 async function performSummarization(text, options = {}) {
-  // In production, use chrome.summarizer or chrome.ai.languageModel
-  // For now, return first few sentences
-  const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
-  return sentences.slice(0, 3).join(' ');
+  console.log('🎯 Background: performSummarization called with', text.length, 'characters');
+
+  try {
+    // Get user preferences for persona
+    const { preferences } = await chrome.storage.local.get('preferences');
+    const persona = options.persona || preferences?.persona || 'strategist';
+
+    console.log('📝 Background: Calling summarizeText with persona:', persona);
+
+    // Check if summarizeText is available
+    if (typeof summarizeText !== 'function') {
+      throw new Error('summarizeText function not available - import may have failed');
+    }
+
+    const result = await summarizeText(text, {
+      persona,
+      length: options.length || 'medium',
+    });
+
+    console.log('📊 Background: summarizeText returned:', {
+      success: result.success,
+      summaryLength: result.summary?.length,
+      method: result.method
+    });
+
+    if (result.success && result.summary) {
+      console.log('✅ Background: AI summary generated successfully');
+      return result.summary;
+    } else {
+      console.warn('⚠️ Background: AI summarization failed, using fallback');
+      // Fallback: return first few sentences
+      const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
+      return sentences.slice(0, 3).join(' ');
+    }
+  } catch (error) {
+    console.error('❌ Background: Summarization error:', error);
+    console.error('Error stack:', error.stack);
+    // Fallback: return first few sentences
+    const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
+    return sentences.slice(0, 3).join(' ');
+  }
 }
 
 /**

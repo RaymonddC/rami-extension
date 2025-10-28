@@ -364,22 +364,49 @@
     }
 
     // Show loading indicator
-    showNotification('Summarizing...', 'info');
+    const loadingNotif = showNotification('🤖 Generating AI summary... This may take up to 2 minutes.', 'info', 120000);
 
     try {
-      const response = await chrome.runtime.sendMessage({
-        action: 'summarize',
-        text: text,
-      });
+      console.log('📝 Requesting AI summary for', text.length, 'characters');
 
-      if (response.success) {
+      // Add timeout wrapper (2 minutes)
+      const response = await Promise.race([
+        chrome.runtime.sendMessage({
+          action: 'summarize',
+          text: text,
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Summarization timeout after 2 minutes')), 120000)
+        )
+      ]);
+
+      console.log('📊 Summarization response:', response);
+
+      // Hide loading notification
+      if (loadingNotif && loadingNotif.remove) {
+        loadingNotif.remove();
+      }
+
+      if (response && response.success && response.data) {
         showSummaryDialog(response.data);
+        showNotification('✅ Summary generated!', 'success');
       } else {
-        showNotification('Summarization failed', 'error');
+        console.error('❌ Summarization failed:', response);
+        showNotification('Summarization failed. Check console for details.', 'error');
       }
     } catch (error) {
-      console.error('Summarization error:', error);
-      showNotification('Error: ' + error.message, 'error');
+      console.error('💥 Summarization error:', error);
+
+      // Hide loading notification
+      if (loadingNotif && loadingNotif.remove) {
+        loadingNotif.remove();
+      }
+
+      if (error.message.includes('timeout')) {
+        showNotification('⏱️ Summarization timed out. Try selecting less text.', 'error', 5000);
+      } else {
+        showNotification('Error: ' + error.message, 'error', 5000);
+      }
     }
   }
 
@@ -531,7 +558,7 @@
   /**
    * Show notification
    */
-  function showNotification(message, type = 'info') {
+  function showNotification(message, type = 'info', duration = 3000) {
     const notification = document.createElement('div');
     notification.className = `ai-reading-notification ${type}`;
     notification.textContent = message;
@@ -542,10 +569,16 @@
       notification.classList.add('show');
     }, 10);
 
-    setTimeout(() => {
-      notification.classList.remove('show');
-      setTimeout(() => notification.remove(), 300);
-    }, 3000);
+    // Auto-hide after duration (unless duration is very long, indicating manual control)
+    if (duration < 100000) {
+      setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => notification.remove(), 300);
+      }, duration);
+    }
+
+    // Return the notification element so it can be manually removed
+    return notification;
   }
 
   /**
