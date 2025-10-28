@@ -4,7 +4,6 @@ import { Map, List, Brain, FileText, LayoutGrid, Trash2, MessageCircleIcon  } fr
 import { useSavedReadings, usePreferences } from '../hooks/useChromeStorage';
 import ReactFlowView, { ReactFlowEmptyState } from '../components/ReactFlowView';
 import MermaidView from '../components/MermaidView';
-import HybridView from '../components/HybridView';
 import PersonaSelector from '../components/PersonaSelector';
 import NodeDetailPopover from '../components/NodeDetailPopover';
 import { extractConcepts } from '../utils/summarize';
@@ -23,6 +22,7 @@ export default function Dashboard() {
     const [concepts, setConcepts] = useState([]);
     const [viewMode, setViewMode] = useState(preferences?.mindmapMode || 'reactflow');
     const [selectedNode, setSelectedNode] = useState(null);
+    const [showingSummary, setShowingSummary] = useState(null); // For summary modal
 
     const handleDeleteReading = async (readingId, event) => {
         event.stopPropagation(); // Prevent selecting the reading when clicking delete
@@ -48,6 +48,22 @@ export default function Dashboard() {
             console.error('❌ Failed to delete reading:', error);
             alert('Failed to delete reading. Please try again.');
         }
+    };
+
+    const handleViewMindmap = (reading) => {
+        console.log('🧠 Opening mindmap for reading:', reading.title);
+
+        // Set the reading and its concepts
+        setSelectedReading(reading);
+        if (reading.concepts && reading.concepts.length > 0) {
+            setConcepts(reading.concepts);
+        }
+
+        // Switch to mindmap tab
+        setActiveTab('mindmap');
+
+        // Update URL hash
+        window.location.hash = 'mindmap';
     };
 
     // Check URL hash on mount and load concepts from latest reading
@@ -173,6 +189,8 @@ export default function Dashboard() {
                                 onSelect={setSelectedReading}
                                 selected={selectedReading}
                                 onDelete={handleDeleteReading}
+                                onViewSummary={setShowingSummary}
+                                onViewMindmap={handleViewMindmap}
                             />
                         </motion.div>
                     )}
@@ -232,19 +250,6 @@ export default function Dashboard() {
                                         >
                                             Mermaid
                                         </button>
-                                        <button
-                                            onClick={() => {
-                                                setViewMode('hybrid');
-                                                setPreferences({ ...preferences, mindmapMode: 'hybrid' });
-                                            }}
-                                            className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                                                viewMode === 'hybrid'
-                                                    ? 'bg-primary-500 text-white shadow-md'
-                                                    : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'
-                                            }`}
-                                        >
-                                            Hybrid
-                                        </button>
                                     </div>
                                 </div>
                             )}
@@ -258,10 +263,8 @@ export default function Dashboard() {
                                     />
                                 ) : viewMode === 'reactflow' ? (
                                     <ReactFlowView concepts={concepts} onNodeClick={handleNodeClick} />
-                                ) : viewMode === 'mermaid' ? (
-                                    <MermaidView concepts={concepts} onNodeClick={handleNodeClick} />
                                 ) : (
-                                    <HybridView concepts={concepts} onNodeClick={handleNodeClick} />
+                                    <MermaidView concepts={concepts} onNodeClick={handleNodeClick} />
                                 )}
                             </div>
                         </motion.div>
@@ -275,7 +278,7 @@ export default function Dashboard() {
                             exit={{ opacity: 0 }}
                             className="h-[calc(100vh-200px)]"
                         >
-                            <StoryboardView concepts={concepts} />
+                            <StoryboardView concepts={concepts} onNodeClick={handleNodeClick} />
                         </motion.div>
                     )}
 
@@ -287,7 +290,7 @@ export default function Dashboard() {
                             exit={{ opacity: 0 }}
                             className="h-[calc(100vh-200px)]"
                         >
-                            <PromptChainEditor />
+                            <PromptChainEditor preferences={preferences} readings={readings} />
                         </motion.div>
                     )}
 
@@ -314,11 +317,103 @@ export default function Dashboard() {
           allConcepts={concepts}
         />
       )}
+
+      {/* Summary Modal */}
+      {showingSummary && (
+        <SummaryModal
+          reading={showingSummary}
+          onClose={() => setShowingSummary(null)}
+        />
+      )}
         </div>
     );
 }
 
-function ReadingsList({ readings, onSelect, selected, onDelete }) {
+/**
+ * Summary Modal Component
+ */
+function SummaryModal({ reading, onClose }) {
+    return (
+        <AnimatePresence>
+            {/* Backdrop */}
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={onClose}
+                className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+                style={{ zIndex: 9999 }}
+            >
+                {/* Modal */}
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-white dark:bg-neutral-800 rounded-xl shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden"
+                >
+                    {/* Header */}
+                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 text-white flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <span className="text-2xl">🤖</span>
+                            <div>
+                                <h3 className="text-lg font-semibold">AI-Generated Summary</h3>
+                                <p className="text-sm opacity-90">Comprehensive summary created during mindmap generation</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={onClose}
+                            className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                        >
+                            ✕
+                        </button>
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-6 overflow-y-auto max-h-[calc(80vh-100px)]">
+                        <div className="mb-4">
+                            <h4 className="font-semibold text-lg mb-2 text-neutral-900 dark:text-neutral-100">
+                                {reading.title}
+                            </h4>
+                            <div className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+                                <span>Summary: ~{Math.floor(reading.summary.length / 5)} words</span>
+                                {reading.content && (
+                                    <span className="ml-2 opacity-75">
+                                        • Original: ~{Math.floor(reading.content.length / 5)} words
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="prose dark:prose-invert max-w-none">
+                            <div className="whitespace-pre-wrap text-neutral-800 dark:text-neutral-200 leading-relaxed">
+                                {reading.summary}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="px-6 py-4 bg-neutral-50 dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-700 flex justify-between items-center">
+                        <div className="text-xs text-neutral-600 dark:text-neutral-400">
+                            AI-generated comprehensive summary • {reading.generationMethod === 'fallback' ? '📝 Fallback mode' : '🤖 AI-powered'}
+                        </div>
+                        <button
+                            onClick={() => {
+                                navigator.clipboard.writeText(reading.summary);
+                                alert('Summary copied to clipboard!');
+                            }}
+                            className="btn-secondary text-sm"
+                        >
+                            Copy Summary
+                        </button>
+                    </div>
+                </motion.div>
+            </motion.div>
+        </AnimatePresence>
+    );
+}
+
+function ReadingsList({ readings, onSelect, selected, onDelete, onViewSummary, onViewMindmap }) {
     if (readings.length === 0) {
         return (
             <div className="text-center py-20">
@@ -355,6 +450,38 @@ function ReadingsList({ readings, onSelect, selected, onDelete }) {
                     <p className="text-sm text-neutral-600 dark:text-neutral-400 line-clamp-3 mb-3">
                         {reading.excerpt || reading.content?.substring(0, 150)}
                     </p>
+
+                    {/* Action buttons */}
+                    <div className="space-y-2 mb-3">
+                        {/* View Mindmap button if concepts exist */}
+                        {reading.concepts && reading.concepts.length > 0 && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onViewMindmap(reading);
+                                }}
+                                className="w-full text-xs bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 px-3 py-2 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors flex items-center justify-center gap-1"
+                            >
+                                <span>🧠</span>
+                                <span>View Mindmap ({reading.concepts.length} concepts)</span>
+                            </button>
+                        )}
+
+                        {/* View Summary button if exists */}
+                        {reading.summary && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onViewSummary(reading);
+                                }}
+                                className="w-full text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-2 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors flex items-center justify-center gap-1"
+                            >
+                                <span>📄</span>
+                                <span>View AI Summary ({Math.floor(reading.summary.length / 5)} words)</span>
+                            </button>
+                        )}
+                    </div>
+
                     <div className="flex items-center justify-between">
                         <div className="text-xs text-neutral-500">
                             {new Date(reading.timestamp).toLocaleDateString()}

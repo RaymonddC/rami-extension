@@ -321,6 +321,7 @@ export async function queryLanguageModel(prompt, options = {}) {
  */
 async function intelligentTextCompression(text, targetLength, depth = 0) {
   const MAX_DEPTH = 3; // Prevent infinite recursion
+  const MIN_COMPRESSION_RATIO = 0.7; // Must reduce by at least 30%
 
   console.log(`${'  '.repeat(depth)}🔄 Compression level ${depth}: ${text.length} chars → target ${targetLength}`);
 
@@ -333,6 +334,12 @@ async function intelligentTextCompression(text, targetLength, depth = 0) {
   // Safety: max recursion depth reached
   if (depth >= MAX_DEPTH) {
     console.log(`${'  '.repeat(depth)}⚠️ Max depth reached, truncating`);
+    return text.substring(0, targetLength);
+  }
+
+  // Safety: text too large to process (prevent crash)
+  if (text.length > 500000) {
+    console.warn(`${'  '.repeat(depth)}⚠️ Text exceeds safe limit (500KB), truncating`);
     return text.substring(0, targetLength);
   }
 
@@ -382,6 +389,13 @@ async function intelligentTextCompression(text, targetLength, depth = 0) {
   const combined = summaries.join('\n\n');
 
   console.log(`${'  '.repeat(depth)}📝 Combined summaries: ${combined.length} chars`);
+
+  // Safety check: ensure we actually compressed the text
+  const compressionRatio = combined.length / text.length;
+  if (compressionRatio >= MIN_COMPRESSION_RATIO) {
+    console.warn(`${'  '.repeat(depth)}⚠️ Compression not effective (${Math.round(compressionRatio * 100)}%), truncating`);
+    return combined.substring(0, targetLength);
+  }
 
   // Recurse: if combined is still too long, compress again
   return await intelligentTextCompression(combined, targetLength, depth + 1);
@@ -433,6 +447,22 @@ export async function extractConcepts(text, options = {}) {
     if (DEBUG) console.log(`✅ Compressed to ${processedText.length} chars`);
   } else {
     if (DEBUG) console.log(`✅ Analyzing full text: ${processedText.length} characters`);
+  }
+
+  // Generate AI summary for display (separate from concept extraction)
+  console.log('📝 Generating AI summary for article...');
+  let aiSummary = null;
+  try {
+    const summaryResult = await summarizeText(processedText, {
+      persona,
+      length: 'long', // Use long format for comprehensive summaries
+    });
+    if (summaryResult.success && summaryResult.summary) {
+      aiSummary = summaryResult.summary;
+      console.log(`✅ AI summary generated (${aiSummary.length} chars)`);
+    }
+  } catch (summaryError) {
+    console.warn('⚠️ Failed to generate AI summary:', summaryError.message);
   }
 
   // Get persona-specific instructions
@@ -511,7 +541,8 @@ Return ONLY the JSON array. Validate all connection IDs exist!`;
               return {
                 success: true,
                 concepts: validatedConcepts,
-                method: result.method
+                method: result.method,
+                processedText: aiSummary // Include the AI-generated summary
               };
             }
           } else {
@@ -534,7 +565,10 @@ Return ONLY the JSON array. Validate all connection IDs exist!`;
   console.log('🔄 Falling back to enhanced concept extraction');
   const fallbackResult = await mockExtractConcepts(text, options);
   console.log('📊 Fallback returned:', fallbackResult.concepts.length, 'concepts');
-  return fallbackResult;
+  return {
+    ...fallbackResult,
+    processedText: aiSummary // Include the AI-generated summary even in fallback
+  };
 }
 
 /**

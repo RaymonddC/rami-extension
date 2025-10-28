@@ -3,6 +3,13 @@
  * Handles Chrome extension background tasks
  */
 
+// Import AI utilities
+import { summarizeText } from '../utils/summarize.js';
+
+// Configuration constants
+const MAX_READINGS = 100; // Limit readings to prevent storage quota issues (Chrome has 10MB limit)
+const MAX_HIGHLIGHTS = 1000; // Limit highlights
+
 // Installation and updates
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
@@ -34,12 +41,6 @@ chrome.runtime.onInstalled.addListener((details) => {
   });
 
   chrome.contextMenus.create({
-    id: 'highlight-text',
-    title: 'Highlight and Analyze',
-    contexts: ['selection'],
-  });
-
-  chrome.contextMenus.create({
     id: 'summarize-selection',
     title: 'Summarize Selection',
     contexts: ['selection'],
@@ -51,10 +52,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   switch (info.menuItemId) {
     case 'save-reading':
       await saveCurrentPage(tab);
-      break;
-
-    case 'highlight-text':
-      await highlightSelection(info, tab);
       break;
 
     case 'summarize-selection':
@@ -74,23 +71,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           break;
 
         case 'summarize':
+          console.log('📨 Background: Received summarize request');
           const summary = await performSummarization(request.text, request.options);
+          console.log('📤 Background: Sending response with summary length:', summary?.length);
           sendResponse({ success: true, data: summary });
-          break;
-
-        case 'extract-concepts':
-          const concepts = await extractConcepts(request.text, request.options);
-          sendResponse({ success: true, data: concepts });
           break;
 
         case 'check-ai-availability':
           const availability = await checkAIStatus();
           sendResponse({ success: true, data: availability });
-          break;
-
-        case 'generate-mindmap':
-          const mindmapResult = await generateMindmap(request.data);
-          sendResponse(mindmapResult);
           break;
 
         case 'open-dashboard':
@@ -145,9 +134,16 @@ async function saveCurrentPage(tab) {
       timestamp: new Date().toISOString(),
     };
 
-    // Save to storage
+    // Save to storage with size limit
     const { readings = [] } = await chrome.storage.local.get('readings');
     readings.unshift(reading);
+
+    // Enforce size limit to prevent storage quota issues
+    if (readings.length > MAX_READINGS) {
+      const removed = readings.splice(MAX_READINGS);
+      console.log(`⚠️ Removed ${removed.length} old readings (limit: ${MAX_READINGS})`);
+    }
+
     await chrome.storage.local.set({ readings });
 
     // Show notification
@@ -177,6 +173,13 @@ async function saveReading(data) {
 
   const { readings = [] } = await chrome.storage.local.get('readings');
   readings.unshift(reading);
+
+  // Enforce size limit
+  if (readings.length > MAX_READINGS) {
+    const removed = readings.splice(MAX_READINGS);
+    console.log(`⚠️ Removed ${removed.length} old readings (limit: ${MAX_READINGS})`);
+  }
+
   await chrome.storage.local.set({ readings });
 
   return reading;
@@ -197,6 +200,13 @@ async function highlightSelection(info, tab) {
 
     const { highlights = [] } = await chrome.storage.local.get('highlights');
     highlights.push(highlight);
+
+    // Enforce size limit
+    if (highlights.length > MAX_HIGHLIGHTS) {
+      const removed = highlights.splice(0, highlights.length - MAX_HIGHLIGHTS);
+      console.log(`⚠️ Removed ${removed.length} old highlights (limit: ${MAX_HIGHLIGHTS})`);
+    }
+
     await chrome.storage.local.set({ highlights });
 
     // Inject content script to visually highlight
@@ -265,29 +275,50 @@ async function checkAIStatus() {
 }
 
 /**
- * Perform summarization (mock implementation)
+ * Perform summarization using AI
  */
 async function performSummarization(text, options = {}) {
-  // In production, use chrome.summarizer or chrome.ai.languageModel
-  // For now, return first few sentences
-  const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
-  return sentences.slice(0, 3).join(' ');
-}
+  console.log('🎯 Background: performSummarization called with', text.length, 'characters');
 
-/**
- * Extract concepts (mock implementation)
- */
-async function extractConcepts(text, options = {}) {
-  // In production, use chrome.ai.languageModel
-  const words = text.split(/\s+/).filter(w => w.length > 4);
-  const uniqueWords = [...new Set(words)].slice(0, 10);
+  try {
+    // Get user preferences for persona
+    const { preferences } = await chrome.storage.local.get('preferences');
+    const persona = options.persona || preferences?.persona || 'strategist';
 
-  return uniqueWords.map((word, index) => ({
-    id: `concept-${index}`,
-    label: word,
-    type: index === 0 ? 'main' : 'secondary',
-    connections: index < uniqueWords.length - 1 ? [`concept-${index + 1}`] : [],
-  }));
+    console.log('📝 Background: Calling summarizeText with persona:', persona);
+
+    // Check if summarizeText is available
+    if (typeof summarizeText !== 'function') {
+      throw new Error('summarizeText function not available - import may have failed');
+    }
+
+    const result = await summarizeText(text, {
+      persona,
+      length: options.length || 'medium',
+    });
+
+    console.log('📊 Background: summarizeText returned:', {
+      success: result.success,
+      summaryLength: result.summary?.length,
+      method: result.method
+    });
+
+    if (result.success && result.summary) {
+      console.log('✅ Background: AI summary generated successfully');
+      return result.summary;
+    } else {
+      console.warn('⚠️ Background: AI summarization failed, using fallback');
+      // Fallback: return first few sentences
+      const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
+      return sentences.slice(0, 3).join(' ');
+    }
+  } catch (error) {
+    console.error('❌ Background: Summarization error:', error);
+    console.error('Error stack:', error.stack);
+    // Fallback: return first few sentences
+    const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
+    return sentences.slice(0, 3).join(' ');
+  }
 }
 
 /**
@@ -299,37 +330,6 @@ function extractPageContent() {
   const excerpt = content.substring(0, 300);
 
   return { content, excerpt };
-}
-
-/**
- * Generate mindmap from text
- */
-async function generateMindmap(data) {
-  try {
-    const { text, title, url } = data;
-
-    // Extract concepts
-    const concepts = await extractConcepts(text, { persona: 'architect', maxConcepts: 8 });
-
-    // Save as a reading with concepts
-    const reading = {
-      id: Date.now().toString(),
-      title: title || 'Mindmap Reading',
-      url: url || '',
-      content: text,
-      timestamp: new Date().toISOString(),
-      concepts: concepts,
-    };
-
-    const { readings = [] } = await chrome.storage.local.get('readings');
-    readings.unshift(reading);
-    await chrome.storage.local.set({ readings });
-
-    return { success: true, data: { reading, concepts } };
-  } catch (error) {
-    console.error('Failed to generate mindmap:', error);
-    return { success: false, error: error.message };
-  }
 }
 
 /**

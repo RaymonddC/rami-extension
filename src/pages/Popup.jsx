@@ -5,7 +5,6 @@ import {
   Sparkles,
   Settings,
   LayoutDashboard,
-  Highlighter,
   X,
   Loader2,
   Copy,
@@ -161,7 +160,7 @@ export default function Popup() {
       console.log('🔍 Extracting concepts...');
       const conceptResult = await extractConcepts(pageContent.text, {
         persona: preferences?.persona || 'architect',
-        maxConcepts: 8,
+        maxConcepts: 20,
       });
 
       console.log('📊 Concept extraction result:', {
@@ -183,6 +182,7 @@ export default function Popup() {
           title: pageContent.title,
           url: currentTab.url,
           content: pageContent.text,
+          summary: conceptResult.processedText, // AI-processed summary used for mindmap
           timestamp: new Date().toISOString(),
           concepts: conceptResult.concepts,
           generationMethod: conceptResult.method, // Track how it was generated
@@ -264,13 +264,6 @@ export default function Popup() {
       <div className="flex-1 overflow-auto">
       <div className="p-4 space-y-3">
         <QuickAction
-          icon={<BookOpen className="w-5 h-5" />}
-          label="Save Current Page"
-          description="Save this page for later reading"
-          onClick={saveCurrentPage}
-        />
-
-        <QuickAction
           icon={<LayoutDashboard className="w-5 h-5" />}
           label="Open Dashboard"
           description="View all your saved readings"
@@ -296,13 +289,6 @@ export default function Popup() {
             }
           }}
           disabled={loadingMindmap}
-        />
-
-        <QuickAction
-          icon={<Highlighter className="w-5 h-5" />}
-          label="View Highlights"
-          description="See your highlighted text"
-          onClick={openDashboard}
         />
       </div>
 

@@ -15,10 +15,14 @@ export default defineConfig({
         // Create directories
         mkdirSync('dist/src/background', { recursive: true });
         mkdirSync('dist/src/content', { recursive: true });
+        mkdirSync('dist/src/utils', { recursive: true });
         mkdirSync('dist/icons', { recursive: true });
 
         // Copy background script
         copyFileSync('src/background/background.js', 'dist/src/background/background.js');
+
+        // Copy utils (needed by background script)
+        copyFileSync('src/utils/summarize.js', 'dist/src/utils/summarize.js');
 
         // Copy content scripts
         copyFileSync('src/content/reader.js', 'dist/src/content/reader.js');

@@ -1,295 +1,274 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import {
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  Edit2,
-  Trash2,
   ArrowRight,
+  Maximize2,
+  Book,
+  GitBranch,
+  FileText,
 } from 'lucide-react';
 
 /**
  * Storyboard View Component
- * Converts mindmaps into linear, narrative sequences
+ * Displays concepts in a linear narrative flow
+ * KISS Principle: Simple horizontal card layout showing concept hierarchy
  */
-export default function StoryboardView({ concepts = [], onUpdate }) {
-  const [storyboards, setStoryboards] = useState(
-    concepts.length > 0 ? generateStoryboards(concepts) : []
-  );
-  const [currentIndex, setCurrentIndex] = useState(0);
+export default function StoryboardView({ concepts = [], onNodeClick }) {
+  const [selectedType, setSelectedType] = useState('all');
 
-  const handleAddFrame = () => {
-    const newFrame = {
-      id: `frame-${Date.now()}`,
-      title: 'New Frame',
-      content: '',
-      visual: null,
-    };
-    const newStoryboards = [...storyboards, newFrame];
-    setStoryboards(newStoryboards);
-    onUpdate?.(newStoryboards);
-  };
+  // Arrange concepts in narrative order: main → secondary branches → tertiary details
+  const narrativeFlow = useMemo(() => {
+    if (!concepts || concepts.length === 0) return [];
 
-  const handleUpdateFrame = (id, updates) => {
-    const newStoryboards = storyboards.map(s =>
-      s.id === id ? { ...s, ...updates } : s
-    );
-    setStoryboards(newStoryboards);
-    onUpdate?.(newStoryboards);
-  };
+    const flow = [];
+    const main = concepts.find(c => c.type === 'main');
+    const secondary = concepts.filter(c => c.type === 'secondary');
+    const tertiary = concepts.filter(c => c.type === 'tertiary');
 
-  const handleRemoveFrame = (id) => {
-    const newStoryboards = storyboards.filter(s => s.id !== id);
-    setStoryboards(newStoryboards);
-    setCurrentIndex(Math.min(currentIndex, newStoryboards.length - 1));
-    onUpdate?.(newStoryboards);
-  };
-
-  const goToNext = () => {
-    if (currentIndex < storyboards.length - 1) {
-      setCurrentIndex(currentIndex + 1);
+    // Start with main concept
+    if (main) {
+      flow.push({ ...main, section: 'Introduction' });
     }
-  };
 
-  const goToPrevious = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
-    }
-  };
+    // Add each secondary with its tertiary children
+    secondary.forEach((sec, index) => {
+      flow.push({
+        ...sec,
+        section: `Branch ${index + 1}`,
+        isNewBranch: true
+      });
 
-  if (storyboards.length === 0) {
-    return <EmptyStoryboardState onAdd={handleAddFrame} />;
+      // Add tertiary concepts connected to this secondary
+      const children = tertiary.filter(ter =>
+        sec.connections && sec.connections.includes(ter.id)
+      );
+
+      children.forEach(child => {
+        flow.push({ ...child, section: `Branch ${index + 1}` });
+      });
+    });
+
+    return flow;
+  }, [concepts]);
+
+  // Filter by type if needed
+  const filteredFlow = selectedType === 'all'
+    ? narrativeFlow
+    : narrativeFlow.filter(c => c.type === selectedType || c.type === 'main');
+
+  if (concepts.length === 0) {
+    return <EmptyStoryboardState />;
   }
 
-  const currentFrame = storyboards[currentIndex];
-
   return (
-    <div className="w-full h-full flex flex-col bg-white dark:bg-neutral-900 rounded-xl">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-700">
-        <div className="flex items-center gap-4">
+    <div className="w-full h-full flex flex-col bg-neutral-50 dark:bg-neutral-900">
+      {/* Header with filters */}
+      <div className="flex items-center justify-between p-4 bg-white dark:bg-neutral-850 border-b border-neutral-200 dark:border-neutral-700">
+        <div className="flex items-center gap-3">
+          <Book className="w-5 h-5 text-primary-500" />
           <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">
-            Storyboard View
+            Narrative Flow
           </h3>
-          <span className="text-sm text-neutral-500 dark:text-neutral-400">
-            {currentIndex + 1} / {storyboards.length}
+          <span className="text-sm text-neutral-500">
+            {filteredFlow.length} concepts
           </span>
         </div>
 
+        {/* Type filter */}
         <div className="flex items-center gap-2">
-          <button onClick={handleAddFrame} className="btn-secondary flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            Add Frame
+          <button
+            onClick={() => setSelectedType('all')}
+            className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${
+              selectedType === 'all'
+                ? 'bg-primary-500 text-white'
+                : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setSelectedType('secondary')}
+            className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${
+              selectedType === 'secondary'
+                ? 'bg-primary-500 text-white'
+                : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+            }`}
+          >
+            Main Concepts
+          </button>
+          <button
+            onClick={() => setSelectedType('tertiary')}
+            className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${
+              selectedType === 'tertiary'
+                ? 'bg-primary-500 text-white'
+                : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'
+            }`}
+          >
+            Details
           </button>
         </div>
       </div>
 
-      {/* Main Storyboard Area */}
-      <div className="flex-1 overflow-hidden flex">
-        {/* Current Frame */}
-        <div className="flex-1 flex items-center justify-center p-8">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentFrame.id}
-              initial={{ opacity: 0, x: 100 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -100 }}
-              className="w-full max-w-4xl"
-            >
-              <StoryboardFrame
-                frame={currentFrame}
-                onUpdate={(updates) => handleUpdateFrame(currentFrame.id, updates)}
-                onRemove={() => handleRemoveFrame(currentFrame.id)}
+      {/* Horizontal scrolling narrative flow */}
+      <div className="flex-1 overflow-x-auto overflow-y-hidden p-8">
+        <div className="flex items-start gap-4 min-w-min">
+          {filteredFlow.map((concept, index) => (
+            <React.Fragment key={concept.id}>
+              {/* Section divider for new branches */}
+              {concept.isNewBranch && index > 0 && (
+                <div className="flex flex-col items-center justify-center px-4 flex-shrink-0">
+                  <GitBranch className="w-6 h-6 text-neutral-400 mb-2" />
+                  <div className="text-xs text-neutral-500 dark:text-neutral-400 whitespace-nowrap">
+                    {concept.section}
+                  </div>
+                </div>
+              )}
+
+              {/* Concept card */}
+              <ConceptCard
+                concept={concept}
+                onClick={() => onNodeClick?.(concept)}
               />
-            </motion.div>
-          </AnimatePresence>
-        </div>
 
-        {/* Navigation Controls */}
-        <div className="flex flex-col items-center justify-center gap-4 p-4 border-l border-neutral-200 dark:border-neutral-700">
-          <button
-            onClick={goToPrevious}
-            disabled={currentIndex === 0}
-            className="btn-secondary p-3 disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-
-          <div className="flex flex-col gap-2">
-            {storyboards.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentIndex(index)}
-                className={`
-                  w-2 h-2 rounded-full transition-all duration-200
-                  ${index === currentIndex
-                    ? 'bg-primary-500 scale-150'
-                    : 'bg-neutral-300 dark:bg-neutral-600 hover:bg-neutral-400 dark:hover:bg-neutral-500'
-                  }
-                `}
-              />
-            ))}
-          </div>
-
-          <button
-            onClick={goToNext}
-            disabled={currentIndex === storyboards.length - 1}
-            className="btn-secondary p-3 disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
+              {/* Connection arrow (except for last item) */}
+              {index < filteredFlow.length - 1 && !filteredFlow[index + 1]?.isNewBranch && (
+                <div className="flex items-center justify-center flex-shrink-0 pt-20">
+                  <ArrowRight className="w-6 h-6 text-neutral-300 dark:text-neutral-600" />
+                </div>
+              )}
+            </React.Fragment>
+          ))}
         </div>
       </div>
 
-      {/* Timeline Footer */}
-      <div className="border-t border-neutral-200 dark:border-neutral-700 p-4">
-        <StoryboardTimeline
-          storyboards={storyboards}
-          currentIndex={currentIndex}
-          onSelect={setCurrentIndex}
-        />
+      {/* Footer hint */}
+      <div className="p-4 bg-white dark:bg-neutral-850 border-t border-neutral-200 dark:border-neutral-700">
+        <p className="text-xs text-neutral-500 dark:text-neutral-400 text-center">
+          💡 Click any card to see detailed explanation • Scroll horizontally to explore the full story
+        </p>
       </div>
     </div>
   );
 }
 
 /**
- * Individual Storyboard Frame
+ * Individual Concept Card in Narrative
  */
-function StoryboardFrame({ frame, onUpdate, onRemove }) {
-  const [isEditing, setIsEditing] = useState(false);
+function ConceptCard({ concept, onClick }) {
+  const getCardStyle = (type) => {
+    switch (type) {
+      case 'main':
+        return {
+          border: 'border-primary-500',
+          bg: 'bg-primary-50 dark:bg-primary-900/20',
+          icon: '🎯',
+          iconBg: 'bg-primary-500',
+        };
+      case 'secondary':
+        return {
+          border: 'border-blue-500',
+          bg: 'bg-blue-50 dark:bg-blue-900/20',
+          icon: '📌',
+          iconBg: 'bg-blue-500',
+        };
+      case 'tertiary':
+        return {
+          border: 'border-purple-500',
+          bg: 'bg-purple-50 dark:bg-purple-900/20',
+          icon: '📝',
+          iconBg: 'bg-purple-500',
+        };
+      default:
+        return {
+          border: 'border-neutral-300',
+          bg: 'bg-neutral-50 dark:bg-neutral-800',
+          icon: '📄',
+          iconBg: 'bg-neutral-500',
+        };
+    }
+  };
+
+  const style = getCardStyle(concept.type);
 
   return (
-    <div className="card">
-      <div className="flex items-start justify-between mb-4">
-        {isEditing ? (
-          <input
-            type="text"
-            value={frame.title}
-            onChange={(e) => onUpdate({ title: e.target.value })}
-            onBlur={() => setIsEditing(false)}
-            className="input font-semibold text-xl"
-            autoFocus
-          />
-        ) : (
-          <h2
-            onClick={() => setIsEditing(true)}
-            className="font-semibold text-xl text-neutral-900 dark:text-neutral-100 cursor-pointer hover:text-primary-500"
-          >
-            {frame.title}
-          </h2>
-        )}
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsEditing(!isEditing)}
-            className="btn-ghost p-2"
-          >
-            <Edit2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={onRemove}
-            className="btn-ghost p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+    <motion.div
+      whileHover={{ y: -4, scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={onClick}
+      className={`
+        flex-shrink-0 w-72 cursor-pointer
+        bg-white dark:bg-neutral-850
+        border-2 ${style.border}
+        rounded-xl shadow-sm hover:shadow-md
+        transition-all duration-200
+        overflow-hidden
+      `}
+    >
+      {/* Card header with icon */}
+      <div className={`${style.bg} px-4 py-3 border-b ${style.border}`}>
+        <div className="flex items-center gap-3">
+          <div className={`${style.iconBg} w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm flex-shrink-0`}>
+            {style.icon}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-xs text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
+              {concept.type}
+            </div>
+          </div>
+          <Maximize2 className="w-4 h-4 text-neutral-400 flex-shrink-0" />
         </div>
       </div>
 
-      {/* Visual Area */}
-      <div className="mb-4 bg-neutral-50 dark:bg-neutral-850 rounded-lg p-8 min-h-[200px] flex items-center justify-center border-2 border-dashed border-neutral-200 dark:border-neutral-700">
-        {frame.visual ? (
-          <div>{frame.visual}</div>
-        ) : (
-          <div className="text-center text-neutral-400 dark:text-neutral-600">
-            <div className="text-4xl mb-2">🎨</div>
-            <p className="text-sm">Visual placeholder</p>
+      {/* Card content */}
+      <div className="p-4">
+        <h4 className="font-semibold text-neutral-900 dark:text-neutral-100 mb-2 line-clamp-2">
+          {concept.label}
+        </h4>
+
+        {/* Connection count */}
+        {concept.connections && concept.connections.length > 0 && (
+          <div className="flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
+            <GitBranch className="w-3 h-3" />
+            <span>{concept.connections.length} connection(s)</span>
+          </div>
+        )}
+
+        {/* Section indicator */}
+        {concept.section && (
+          <div className="mt-3 pt-3 border-t border-neutral-200 dark:border-neutral-700">
+            <div className="flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
+              <FileText className="w-3 h-3" />
+              <span>{concept.section}</span>
+            </div>
           </div>
         )}
       </div>
-
-      {/* Content Area */}
-      <textarea
-        value={frame.content}
-        onChange={(e) => onUpdate({ content: e.target.value })}
-        className="textarea min-h-[120px]"
-        placeholder="Describe this step in your storyboard..."
-      />
-    </div>
-  );
-}
-
-/**
- * Timeline View
- */
-function StoryboardTimeline({ storyboards, currentIndex, onSelect }) {
-  return (
-    <div className="flex items-center gap-2 overflow-x-auto pb-2">
-      {storyboards.map((frame, index) => (
-        <React.Fragment key={frame.id}>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => onSelect(index)}
-            className={`
-              flex-shrink-0 w-32 p-3 rounded-lg border-2 transition-all duration-200
-              ${index === currentIndex
-                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600'
-              }
-            `}
-          >
-            <div className="text-xs font-medium text-neutral-900 dark:text-neutral-100 mb-1 truncate">
-              {frame.title}
-            </div>
-            <div className="text-xs text-neutral-500 dark:text-neutral-400">
-              Frame {index + 1}
-            </div>
-          </motion.button>
-
-          {index < storyboards.length - 1 && (
-            <ArrowRight className="flex-shrink-0 w-4 h-4 text-neutral-400" />
-          )}
-        </React.Fragment>
-      ))}
-    </div>
+    </motion.div>
   );
 }
 
 /**
  * Empty State
  */
-function EmptyStoryboardState({ onAdd }) {
+function EmptyStoryboardState() {
   return (
-    <div className="w-full h-full flex items-center justify-center bg-white dark:bg-neutral-900 rounded-xl">
+    <div className="w-full h-full flex items-center justify-center bg-neutral-50 dark:bg-neutral-900">
       <div className="text-center max-w-md p-8">
-        <div className="text-6xl mb-4">🎬</div>
+        <div className="text-6xl mb-4">📖</div>
         <h3 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
-          Create Your Storyboard
+          No Mindmap Yet
         </h3>
         <p className="text-neutral-600 dark:text-neutral-400 mb-6">
-          Transform your mindmap into a linear narrative. Perfect for learning sequences,
-          presentations, or planning workflows.
+          Generate a mindmap first to see the narrative flow. The storyboard will arrange
+          your concepts in a linear, easy-to-follow sequence.
         </p>
-        <button onClick={onAdd} className="btn-primary">
-          Create First Frame
+        <button
+          onClick={() => window.location.hash = '#mindmap'}
+          className="btn-primary"
+        >
+          Go to Mindmap
         </button>
       </div>
     </div>
   );
-}
-
-/**
- * Generate storyboards from concepts
- */
-function generateStoryboards(concepts) {
-  if (!concepts || concepts.length === 0) return [];
-
-  return concepts.map((concept, index) => ({
-    id: concept.id,
-    title: concept.label,
-    content: `Exploring: ${concept.label}`,
-    visual: null,
-  }));
 }

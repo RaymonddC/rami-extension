@@ -13,7 +13,7 @@ export const FEATURES = {
 
   // Work in progress (disabled in production)
   storyboard: false,  // Visual timeline view of concepts - needs completion
-  prompts: false,     // Custom prompt chain editor - needs completion
+  prompts: true,      // Custom prompt chain editor with execution visualization
 };
 
 /**
@@ -21,16 +21,32 @@ export const FEATURES = {
  */
 export const FEATURE_INFO = {
   storyboard: {
-    name: 'Storyboard',
-    description: 'Visual timeline that arranges concepts in a narrative flow, showing how ideas connect sequentially',
-    status: 'Work in Progress',
-    reason: 'Layout and interaction logic needs to be completed',
+    name: 'Storyboard View',
+    description: 'Displays concepts in a horizontal narrative flow, showing the story of your content from start to finish. Features clickable cards, visual hierarchy, and section dividers.',
+    status: '✅ Completed',
+    features: [
+      'Sequential layout: main → branches → details',
+      'Visual cards with type-based coloring',
+      'Click any card for AI explanation',
+      'Filter by concept type (all/main/details)',
+      'Horizontal scroll through narrative',
+      'Section dividers for clarity',
+    ],
   },
 
   prompts: {
     name: 'Prompt Chain Editor',
-    description: 'Create and manage custom AI prompt chains for advanced content analysis workflows',
-    status: 'Work in Progress',
-    reason: 'Prompt execution pipeline and storage need implementation',
+    description: 'Create and manage custom AI prompt chains for advanced content analysis workflows with real-time execution visualization',
+    status: '✅ Completed',
+    features: [
+      'Drag-and-drop step builder',
+      'Real-time execution progress bar',
+      'Status badges (waiting, running, completed, error)',
+      'Live output streaming display',
+      'Execution time tracking',
+      'Visual flow indicators showing data passing',
+      'Step types: Summarize, Extract, Visualize, Reflect',
+      'Sequential execution with context passing',
+    ],
   },
 };

@@ -64,27 +64,6 @@ export default function Options() {
             </div>
           </section>
 
-          {/* Mindmap Mode */}
-          <section className="card">
-            <h2 className="text-xl font-semibold mb-4 text-neutral-900 dark:text-neutral-100">
-              Default Mindmap View
-            </h2>
-            <div className="space-y-2">
-              {['reactflow', 'mermaid', 'hybrid'].map((mode) => (
-                <label key={mode} className="flex items-center gap-3 p-3 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="mindmapMode"
-                    checked={preferences?.mindmapMode === mode}
-                    onChange={() => setPreferences({ ...preferences, mindmapMode: mode })}
-                    className="w-4 h-4"
-                  />
-                  <span className="capitalize font-medium">{mode}</span>
-                </label>
-              ))}
-            </div>
-          </section>
-
           {/* Auto Features */}
           <section className="card">
             <h2 className="text-xl font-semibold mb-4 text-neutral-900 dark:text-neutral-100">

@@ -32,6 +32,7 @@ async function buildExtension() {
   console.log('📁 Creating directories...');
   mkdirSync('dist/src/background', { recursive: true });
   mkdirSync('dist/src/content', { recursive: true });
+  mkdirSync('dist/src/utils', { recursive: true });
   mkdirSync('dist/icons', { recursive: true });
 
   // Copy manifest
@@ -46,6 +47,10 @@ async function buildExtension() {
   console.log('📝 Copying content scripts...');
   copyFileSync('src/content/reader.js', 'dist/src/content/reader.js');
   copyFileSync('src/content/reader.css', 'dist/src/content/reader.css');
+
+  // Copy utils (needed by background script)
+  console.log('🔧 Copying utils...');
+  copyFileSync('src/utils/summarize.js', 'dist/src/utils/summarize.js');
 
   // Copy icons if they exist
   console.log('🎨 Copying icons...');

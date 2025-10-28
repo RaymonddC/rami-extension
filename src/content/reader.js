@@ -15,11 +15,16 @@
   // State
   let isReaderMode = false;
   let originalContent = null;
+  let isInitialized = false;
 
   /**
    * Initialize content script
    */
   function initialize() {
+    // Prevent double initialization
+    if (isInitialized) return;
+    isInitialized = true;
+
     // Listen for messages from extension
     chrome.runtime.onMessage.addListener(handleMessage);
 
@@ -31,6 +36,32 @@
 
     // Create floating toolbar
     createFloatingToolbar();
+
+    // Clean up on page unload to prevent memory leaks
+    window.addEventListener('beforeunload', cleanup);
+  }
+
+  /**
+   * Cleanup function to remove event listeners
+   */
+  function cleanup() {
+    console.log('Rami: Cleaning up content script');
+
+    // Remove event listeners
+    document.removeEventListener('keydown', handleKeyboard);
+    document.removeEventListener('mouseup', handleSelection);
+    chrome.runtime.onMessage.removeListener(handleMessage);
+
+    // Remove toolbar if exists
+    const toolbar = document.getElementById('ai-reading-studio-toolbar');
+    if (toolbar) {
+      toolbar.remove();
+    }
+
+    // Reset state
+    isInitialized = false;
+    isReaderMode = false;
+    originalContent = null;
   }
 
   /**
@@ -333,23 +364,88 @@
     }
 
     // Show loading indicator
-    showNotification('Summarizing...', 'info');
+    const loadingNotif = showNotification('🤖 Generating AI summary... This may take up to 2 minutes.', 'info', 120000);
 
     try {
-      const response = await chrome.runtime.sendMessage({
-        action: 'summarize',
-        text: text,
-      });
+      console.log('📝 Requesting AI summary for', text.length, 'characters');
 
-      if (response.success) {
+      // Add timeout wrapper (2 minutes)
+      const response = await Promise.race([
+        chrome.runtime.sendMessage({
+          action: 'summarize',
+          text: text,
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Summarization timeout after 2 minutes')), 120000)
+        )
+      ]);
+
+      console.log('📊 Summarization response:', response);
+
+      // Hide loading notification
+      if (loadingNotif && loadingNotif.remove) {
+        loadingNotif.remove();
+      }
+
+      if (response && response.success && response.data) {
         showSummaryDialog(response.data);
+        showNotification('✅ Summary generated!', 'success');
       } else {
-        showNotification('Summarization failed', 'error');
+        console.error('❌ Summarization failed:', response);
+        showNotification('Summarization failed. Check console for details.', 'error');
       }
     } catch (error) {
-      console.error('Summarization error:', error);
-      showNotification('Error: ' + error.message, 'error');
+      console.error('💥 Summarization error:', error);
+
+      // Hide loading notification
+      if (loadingNotif && loadingNotif.remove) {
+        loadingNotif.remove();
+      }
+
+      if (error.message.includes('timeout')) {
+        showNotification('⏱️ Summarization timed out. Try selecting less text.', 'error', 5000);
+      } else {
+        showNotification('Error: ' + error.message, 'error', 5000);
+      }
     }
+  }
+
+  /**
+   * Convert Markdown to HTML
+   */
+  function convertMarkdownToHTML(markdown) {
+    if (!markdown) return '';
+
+    let html = markdown;
+
+    // Convert bullet points (* text) to list items
+    const bulletLines = html.split(/\n/).map(line => line.trim()).filter(line => line);
+    const hasBullets = bulletLines.some(line => line.startsWith('* '));
+
+    if (hasBullets) {
+      const listItems = bulletLines
+        .map(line => {
+          if (line.startsWith('* ')) {
+            return `<li>${line.substring(2).trim()}</li>`;
+          }
+          return line;
+        })
+        .join('');
+      html = `<ul>${listItems}</ul>`;
+    }
+
+    // Convert **bold** to <strong>
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+    // Convert *italic* to <em>
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+    // Convert line breaks (if not already in list)
+    if (!hasBullets) {
+      html = html.replace(/\n/g, '<br>');
+    }
+
+    return html;
   }
 
   /**
@@ -358,6 +454,10 @@
   function showSummaryDialog(summary) {
     const dialog = document.createElement('div');
     dialog.className = 'ai-reading-summary-dialog';
+
+    // Convert Markdown to HTML
+    const htmlSummary = convertMarkdownToHTML(summary);
+
     dialog.innerHTML = `
       <div class="dialog-content">
         <div class="dialog-header">
@@ -365,7 +465,7 @@
           <button class="dialog-close">&times;</button>
         </div>
         <div class="dialog-body">
-          <p>${summary}</p>
+          <div class="summary-content">${htmlSummary}</div>
         </div>
       </div>
     `;
@@ -394,7 +494,6 @@
     toolbar.innerHTML = `
       <button data-action="highlight" title="Highlight (Alt+H)">✏️</button>
       <button data-action="summarize" title="Summarize (Alt+S)">📝</button>
-      <button data-action="mindmap" title="Generate Mindmap">🧠</button>
     `;
 
     document.body.appendChild(toolbar);
@@ -441,66 +540,15 @@
       case 'summarize':
         summarizeCurrentSelection();
         break;
-      case 'mindmap':
-        generateMindmapFromSelection();
-        break;
     }
 
     hideSelectionMenu();
   }
 
   /**
-   * Generate mindmap from selection
-   */
-  async function generateMindmapFromSelection() {
-    const selection = window.getSelection();
-    const text = selection.toString().trim();
-
-    if (text.length < 100) {
-      showNotification('Please select more text (at least 100 characters)', 'error');
-      return;
-    }
-
-    showNotification('Generating mindmap...', 'info');
-
-    try {
-      // Send text to background script for concept extraction
-      const response = await chrome.runtime.sendMessage({
-        action: 'generate-mindmap',
-        data: {
-          text: text,
-          title: document.title,
-          url: window.location.href,
-        },
-      });
-
-      if (response.success) {
-        showNotification('Mindmap generated successfully!', 'success');
-        // Open dashboard
-        chrome.runtime.sendMessage({
-          action: 'open-dashboard',
-          tab: 'mindmap',
-        });
-      } else {
-        throw new Error(response.error || 'Failed to extract concepts');
-      }
-    } catch (error) {
-      console.error('Mindmap generation error:', error);
-
-      // Check if it's the "Extension context invalidated" error
-      if (error.message.includes('Extension context invalidated')) {
-        showNotification('⚠️ Please reload this page after updating the extension', 'error');
-        console.log('💡 Tip: Press F5 or Ctrl+R to reload the page');
-      } else {
-        showNotification('Error generating mindmap: ' + error.message, 'error');
-      }
-    }
-  }
-
-  /**
    * Show notification
    */
-  function showNotification(message, type = 'info') {
+  function showNotification(message, type = 'info', duration = 3000) {
     const notification = document.createElement('div');
     notification.className = `ai-reading-notification ${type}`;
     notification.textContent = message;
@@ -511,10 +559,16 @@
       notification.classList.add('show');
     }, 10);
 
-    setTimeout(() => {
-      notification.classList.remove('show');
-      setTimeout(() => notification.remove(), 300);
-    }, 3000);
+    // Auto-hide after duration (unless duration is very long, indicating manual control)
+    if (duration < 100000) {
+      setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => notification.remove(), 300);
+      }, duration);
+    }
+
+    // Return the notification element so it can be manually removed
+    return notification;
   }
 
   /**

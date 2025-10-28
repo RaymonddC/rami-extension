@@ -26,6 +26,8 @@ export default function NodeDetailPopover({
   useEffect(() => {
     if (!concept) return;
 
+    let isCancelled = false; // Track if this effect was cleaned up
+
     async function loadDetails() {
       setLoading(true);
       setError(null);
@@ -35,6 +37,12 @@ export default function NodeDetailPopover({
         const result = await explainConcept(concept.label, originalText, {
           persona: 'mentor' // Use mentor for clear, accessible explanations
         });
+
+        // Don't update state if component unmounted or concept changed
+        if (isCancelled) {
+          console.log('🚫 AI request cancelled (concept changed)');
+          return;
+        }
 
         if (result.success) {
           setExplanation(result.explanation);
@@ -47,14 +55,23 @@ export default function NodeDetailPopover({
         setExcerpt(extractedExcerpt);
 
       } catch (err) {
-        console.error('Failed to load node details:', err);
-        setError('Failed to load details');
+        if (!isCancelled) {
+          console.error('Failed to load node details:', err);
+          setError('Failed to load details');
+        }
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     }
 
     loadDetails();
+
+    // Cleanup function - cancel pending requests
+    return () => {
+      isCancelled = true;
+    };
   }, [concept, originalText]);
 
   if (!concept) return null;
