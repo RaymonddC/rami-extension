@@ -14,6 +14,44 @@ import StoryboardView from '../components/StoryboardView';
 import PromptChainEditor from '../components/PromptChainEditor';
 import Quiz from '../components/Quiz';
 
+/**
+ * Convert Markdown to HTML
+ */
+function convertMarkdownToHTML(markdown) {
+  if (!markdown) return '';
+
+  let html = markdown;
+
+  // Convert bullet points (* text) to list items
+  const bulletLines = html.split(/\n/).map(line => line.trim()).filter(line => line);
+  const hasBullets = bulletLines.some(line => line.startsWith('* '));
+
+  if (hasBullets) {
+    const listItems = bulletLines
+      .map(line => {
+        if (line.startsWith('* ')) {
+          return `<li>${line.substring(2).trim()}</li>`;
+        }
+        return line;
+      })
+      .join('');
+    html = `<ul>${listItems}</ul>`;
+  }
+
+  // Convert **bold** to <strong>
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+  // Convert *italic* to <em>
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+  // Convert line breaks (if not already in list)
+  if (!hasBullets) {
+    html = html.replace(/\n/g, '<br>');
+  }
+
+  return html;
+}
+
 export default function Dashboard() {
     const { readings, removeReading } = useSavedReadings();
     const { preferences, setPreferences } = usePreferences();
@@ -386,9 +424,10 @@ function SummaryModal({ reading, onClose }) {
                         </div>
 
                         <div className="prose dark:prose-invert max-w-none">
-                            <div className="whitespace-pre-wrap text-neutral-800 dark:text-neutral-200 leading-relaxed">
-                                {reading.summary}
-                            </div>
+                            <div
+                                className="text-neutral-800 dark:text-neutral-200 leading-relaxed summary-content"
+                                dangerouslySetInnerHTML={{ __html: convertMarkdownToHTML(reading.summary) }}
+                            />
                         </div>
                     </div>
 
