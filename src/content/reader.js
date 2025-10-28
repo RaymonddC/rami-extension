@@ -411,11 +411,53 @@
   }
 
   /**
+   * Convert Markdown to HTML
+   */
+  function convertMarkdownToHTML(markdown) {
+    if (!markdown) return '';
+
+    let html = markdown;
+
+    // Convert bullet points (* text) to list items
+    const bulletLines = html.split(/\n/).map(line => line.trim()).filter(line => line);
+    const hasBullets = bulletLines.some(line => line.startsWith('* '));
+
+    if (hasBullets) {
+      const listItems = bulletLines
+        .map(line => {
+          if (line.startsWith('* ')) {
+            return `<li>${line.substring(2).trim()}</li>`;
+          }
+          return line;
+        })
+        .join('');
+      html = `<ul>${listItems}</ul>`;
+    }
+
+    // Convert **bold** to <strong>
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+    // Convert *italic* to <em>
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+    // Convert line breaks (if not already in list)
+    if (!hasBullets) {
+      html = html.replace(/\n/g, '<br>');
+    }
+
+    return html;
+  }
+
+  /**
    * Show summary dialog
    */
   function showSummaryDialog(summary) {
     const dialog = document.createElement('div');
     dialog.className = 'ai-reading-summary-dialog';
+
+    // Convert Markdown to HTML
+    const htmlSummary = convertMarkdownToHTML(summary);
+
     dialog.innerHTML = `
       <div class="dialog-content">
         <div class="dialog-header">
@@ -423,7 +465,7 @@
           <button class="dialog-close">&times;</button>
         </div>
         <div class="dialog-body">
-          <p>${summary}</p>
+          <div class="summary-content">${htmlSummary}</div>
         </div>
       </div>
     `;
@@ -452,7 +494,6 @@
     toolbar.innerHTML = `
       <button data-action="highlight" title="Highlight (Alt+H)">✏️</button>
       <button data-action="summarize" title="Summarize (Alt+S)">📝</button>
-      <button data-action="mindmap" title="Generate Mindmap">🧠</button>
     `;
 
     document.body.appendChild(toolbar);
@@ -499,60 +540,9 @@
       case 'summarize':
         summarizeCurrentSelection();
         break;
-      case 'mindmap':
-        generateMindmapFromSelection();
-        break;
     }
 
     hideSelectionMenu();
-  }
-
-  /**
-   * Generate mindmap from selection
-   */
-  async function generateMindmapFromSelection() {
-    const selection = window.getSelection();
-    const text = selection.toString().trim();
-
-    if (text.length < 100) {
-      showNotification('Please select more text (at least 100 characters)', 'error');
-      return;
-    }
-
-    showNotification('Generating mindmap...', 'info');
-
-    try {
-      // Send text to background script for concept extraction
-      const response = await chrome.runtime.sendMessage({
-        action: 'generate-mindmap',
-        data: {
-          text: text,
-          title: document.title,
-          url: window.location.href,
-        },
-      });
-
-      if (response.success) {
-        showNotification('Mindmap generated successfully!', 'success');
-        // Open dashboard
-        chrome.runtime.sendMessage({
-          action: 'open-dashboard',
-          tab: 'mindmap',
-        });
-      } else {
-        throw new Error(response.error || 'Failed to extract concepts');
-      }
-    } catch (error) {
-      console.error('Mindmap generation error:', error);
-
-      // Check if it's the "Extension context invalidated" error
-      if (error.message.includes('Extension context invalidated')) {
-        showNotification('⚠️ Please reload this page after updating the extension', 'error');
-        console.log('💡 Tip: Press F5 or Ctrl+R to reload the page');
-      } else {
-        showNotification('Error generating mindmap: ' + error.message, 'error');
-      }
-    }
   }
 
   /**

@@ -77,19 +77,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           sendResponse({ success: true, data: summary });
           break;
 
-        case 'extract-concepts':
-          const concepts = await extractConcepts(request.text, request.options);
-          sendResponse({ success: true, data: concepts });
-          break;
-
         case 'check-ai-availability':
           const availability = await checkAIStatus();
           sendResponse({ success: true, data: availability });
-          break;
-
-        case 'generate-mindmap':
-          const mindmapResult = await generateMindmap(request.data);
-          sendResponse(mindmapResult);
           break;
 
         case 'open-dashboard':
@@ -332,22 +322,6 @@ async function performSummarization(text, options = {}) {
 }
 
 /**
- * Extract concepts (mock implementation)
- */
-async function extractConcepts(text, options = {}) {
-  // In production, use chrome.ai.languageModel
-  const words = text.split(/\s+/).filter(w => w.length > 4);
-  const uniqueWords = [...new Set(words)].slice(0, 10);
-
-  return uniqueWords.map((word, index) => ({
-    id: `concept-${index}`,
-    label: word,
-    type: index === 0 ? 'main' : 'secondary',
-    connections: index < uniqueWords.length - 1 ? [`concept-${index + 1}`] : [],
-  }));
-}
-
-/**
  * Helper function to extract page content (runs in page context)
  */
 function extractPageContent() {
@@ -356,37 +330,6 @@ function extractPageContent() {
   const excerpt = content.substring(0, 300);
 
   return { content, excerpt };
-}
-
-/**
- * Generate mindmap from text
- */
-async function generateMindmap(data) {
-  try {
-    const { text, title, url } = data;
-
-    // Extract concepts
-    const concepts = await extractConcepts(text, { persona: 'architect', maxConcepts: 8 });
-
-    // Save as a reading with concepts
-    const reading = {
-      id: Date.now().toString(),
-      title: title || 'Mindmap Reading',
-      url: url || '',
-      content: text,
-      timestamp: new Date().toISOString(),
-      concepts: concepts,
-    };
-
-    const { readings = [] } = await chrome.storage.local.get('readings');
-    readings.unshift(reading);
-    await chrome.storage.local.set({ readings });
-
-    return { success: true, data: { reading, concepts } };
-  } catch (error) {
-    console.error('Failed to generate mindmap:', error);
-    return { success: false, error: error.message };
-  }
 }
 
 /**

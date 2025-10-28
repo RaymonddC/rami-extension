@@ -25,6 +25,44 @@ import { queryLanguageModel } from '../utils/summarize';
 const MAX_CHAIN_STEPS = 20; // Prevent excessively long chains
 const MAX_EXECUTION_TIME_MS = 10 * 60 * 1000; // 10 minutes total timeout
 
+/**
+ * Convert Markdown to HTML
+ */
+function convertMarkdownToHTML(markdown) {
+  if (!markdown) return '';
+
+  let html = markdown;
+
+  // Convert bullet points (* text) to list items
+  const bulletLines = html.split(/\n/).map(line => line.trim()).filter(line => line);
+  const hasBullets = bulletLines.some(line => line.startsWith('* '));
+
+  if (hasBullets) {
+    const listItems = bulletLines
+      .map(line => {
+        if (line.startsWith('* ')) {
+          return `<li>${line.substring(2).trim()}</li>`;
+        }
+        return line;
+      })
+      .join('');
+    html = `<ul>${listItems}</ul>`;
+  }
+
+  // Convert **bold** to <strong>
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+  // Convert *italic* to <em>
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+  // Convert line breaks (if not already in list)
+  if (!hasBullets) {
+    html = html.replace(/\n/g, '<br>');
+  }
+
+  return html;
+}
+
 export default function PromptChainEditor({ chain = [], onChange, onExecute, preferences = {}, readings = [] }) {
   const [steps, setSteps] = useState(chain);
   const [executionState, setExecutionState] = useState('idle'); // idle, running, completed, error
@@ -428,9 +466,10 @@ function ChainStep({ step, index, onUpdate, onRemove }) {
                         </div>
                       )}
                     </div>
-                    <div className="text-sm text-neutral-900 dark:text-neutral-100 whitespace-pre-wrap">
-                      {step.output}
-                    </div>
+                    <div
+                      className="text-sm text-neutral-900 dark:text-neutral-100 prompt-output-content"
+                      dangerouslySetInnerHTML={{ __html: convertMarkdownToHTML(step.output) }}
+                    />
                   </div>
                 )}
 

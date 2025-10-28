@@ -232,6 +232,37 @@
   margin: 0;
 }
 
+/* Summary Content Styles */
+.summary-content {
+  line-height: 1.8;
+  color: #333;
+}
+
+.summary-content ul {
+  margin: 0;
+  padding-left: 1.5rem;
+  list-style-type: disc;
+}
+
+.summary-content li {
+  margin-bottom: 0.75rem;
+  padding-left: 0.5rem;
+}
+
+.summary-content li:last-child {
+  margin-bottom: 0;
+}
+
+.summary-content strong {
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.summary-content em {
+  font-style: italic;
+  color: #555;
+}
+
 /* Notifications */
 .ai-reading-notification {
   position: fixed;
