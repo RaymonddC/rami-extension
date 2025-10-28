@@ -8,6 +8,7 @@ import PersonaSelector from '../components/PersonaSelector';
 import NodeDetailPopover from '../components/NodeDetailPopover';
 import { extractConcepts } from '../utils/summarize';
 import { FEATURES } from '../config/features';
+import { convertMarkdownToHTML } from '../utils/markdown';
 
 // Conditionally import work-in-progress features
 import StoryboardView from '../components/StoryboardView';
@@ -386,9 +387,10 @@ function SummaryModal({ reading, onClose }) {
                         </div>
 
                         <div className="prose dark:prose-invert max-w-none">
-                            <div className="whitespace-pre-wrap text-neutral-800 dark:text-neutral-200 leading-relaxed">
-                                {reading.summary}
-                            </div>
+                            <div
+                                className="text-neutral-800 dark:text-neutral-200 leading-relaxed summary-content"
+                                dangerouslySetInnerHTML={{ __html: convertMarkdownToHTML(reading.summary) }}
+                            />
                         </div>
                     </div>
 

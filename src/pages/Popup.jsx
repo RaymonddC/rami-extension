@@ -222,6 +222,12 @@ export default function Popup() {
   };
 
   const currentPersona = PERSONAS[preferences?.persona || 'strategist'];
+  const [showPersonaDropdown, setShowPersonaDropdown] = useState(false);
+
+  const handlePersonaChange = (personaId) => {
+    setPreferences({ ...preferences, persona: personaId });
+    setShowPersonaDropdown(false);
+  };
 
   return (
     <div className="w-[400px] h-[600px] bg-white dark:bg-neutral-900 flex flex-col">
@@ -237,12 +243,68 @@ export default function Popup() {
           </button>
         </div>
 
-        <div className="flex items-center gap-3 bg-white/10 rounded-lg p-3">
-          <span className="text-3xl">{currentPersona.icon}</span>
-          <div className="flex-1">
-            <div className="text-sm opacity-90">Current Persona</div>
-            <div className="font-semibold">{currentPersona.name}</div>
-          </div>
+        {/* Persona Selector */}
+        <div className="relative">
+          <button
+            onClick={() => setShowPersonaDropdown(!showPersonaDropdown)}
+            className="w-full flex items-center gap-3 bg-white/10 hover:bg-white/20 rounded-lg p-3 transition-colors"
+          >
+            <span className="text-3xl">{currentPersona.icon}</span>
+            <div className="flex-1 text-left">
+              <div className="text-sm opacity-90">Current Persona</div>
+              <div className="font-semibold">{currentPersona.name}</div>
+            </div>
+            <motion.div
+              animate={{ rotate: showPersonaDropdown ? 180 : 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              ▼
+            </motion.div>
+          </button>
+
+          {/* Persona Dropdown */}
+          <AnimatePresence>
+            {showPersonaDropdown && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-neutral-800 rounded-lg shadow-2xl border border-neutral-200 dark:border-neutral-700 overflow-hidden z-50"
+              >
+                {Object.values(PERSONAS).map((persona) => (
+                  <button
+                    key={persona.id}
+                    onClick={() => handlePersonaChange(persona.id)}
+                    className={`w-full flex items-center gap-3 p-3 transition-all text-left border-b border-neutral-100 dark:border-neutral-700 last:border-b-0 ${
+                      preferences?.persona === persona.id
+                        ? 'bg-primary-50 dark:bg-primary-900/20'
+                        : 'hover:bg-neutral-50 dark:hover:bg-neutral-700'
+                    }`}
+                  >
+                    <span className="text-2xl">{persona.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className={`font-semibold text-sm ${
+                        preferences?.persona === persona.id
+                          ? 'text-primary-600 dark:text-primary-400'
+                          : 'text-neutral-900 dark:text-neutral-100'
+                      }`}>
+                        {persona.name}
+                      </div>
+                      <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                        {persona.beverage}
+                      </div>
+                      <div className="text-xs text-neutral-500 dark:text-neutral-400 line-clamp-2 mt-0.5">
+                        {persona.description}
+                      </div>
+                    </div>
+                    {preferences?.persona === persona.id && (
+                      <CheckCircle className="w-4 h-4 text-primary-500 flex-shrink-0" />
+                    )}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
