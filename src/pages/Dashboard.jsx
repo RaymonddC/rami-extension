@@ -50,6 +50,22 @@ export default function Dashboard() {
         }
     };
 
+    const handleViewMindmap = (reading) => {
+        console.log('🧠 Opening mindmap for reading:', reading.title);
+
+        // Set the reading and its concepts
+        setSelectedReading(reading);
+        if (reading.concepts && reading.concepts.length > 0) {
+            setConcepts(reading.concepts);
+        }
+
+        // Switch to mindmap tab
+        setActiveTab('mindmap');
+
+        // Update URL hash
+        window.location.hash = 'mindmap';
+    };
+
     // Check URL hash on mount and load concepts from latest reading
     useEffect(() => {
         const hash = window.location.hash.replace('#', '');
@@ -174,6 +190,7 @@ export default function Dashboard() {
                                 selected={selectedReading}
                                 onDelete={handleDeleteReading}
                                 onViewSummary={setShowingSummary}
+                                onViewMindmap={handleViewMindmap}
                             />
                         </motion.div>
                     )}
@@ -396,7 +413,7 @@ function SummaryModal({ reading, onClose }) {
     );
 }
 
-function ReadingsList({ readings, onSelect, selected, onDelete, onViewSummary }) {
+function ReadingsList({ readings, onSelect, selected, onDelete, onViewSummary, onViewMindmap }) {
     if (readings.length === 0) {
         return (
             <div className="text-center py-20">
@@ -434,19 +451,36 @@ function ReadingsList({ readings, onSelect, selected, onDelete, onViewSummary })
                         {reading.excerpt || reading.content?.substring(0, 150)}
                     </p>
 
-                    {/* Show summary button if exists */}
-                    {reading.summary && (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onViewSummary(reading);
-                            }}
-                            className="mb-3 w-full text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-2 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors flex items-center justify-center gap-1"
-                        >
-                            <span>📄</span>
-                            <span>View AI Summary ({Math.floor(reading.summary.length / 5)} words)</span>
-                        </button>
-                    )}
+                    {/* Action buttons */}
+                    <div className="space-y-2 mb-3">
+                        {/* View Mindmap button if concepts exist */}
+                        {reading.concepts && reading.concepts.length > 0 && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onViewMindmap(reading);
+                                }}
+                                className="w-full text-xs bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 px-3 py-2 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors flex items-center justify-center gap-1"
+                            >
+                                <span>🧠</span>
+                                <span>View Mindmap ({reading.concepts.length} concepts)</span>
+                            </button>
+                        )}
+
+                        {/* View Summary button if exists */}
+                        {reading.summary && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onViewSummary(reading);
+                                }}
+                                className="w-full text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-2 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors flex items-center justify-center gap-1"
+                            >
+                                <span>📄</span>
+                                <span>View AI Summary ({Math.floor(reading.summary.length / 5)} words)</span>
+                            </button>
+                        )}
+                    </div>
 
                     <div className="flex items-center justify-between">
                         <div className="text-xs text-neutral-500">

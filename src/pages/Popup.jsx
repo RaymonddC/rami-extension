@@ -160,7 +160,7 @@ export default function Popup() {
       console.log('🔍 Extracting concepts...');
       const conceptResult = await extractConcepts(pageContent.text, {
         persona: preferences?.persona || 'architect',
-        maxConcepts: 8,
+        maxConcepts: 20,
       });
 
       console.log('📊 Concept extraction result:', {
