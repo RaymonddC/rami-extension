@@ -4,7 +4,7 @@
  */
 
 // Configuration constants
-const MAX_READINGS = 500; // Limit readings to prevent storage quota issues (Chrome has 10MB limit)
+const MAX_READINGS = 100; // Limit readings to prevent storage quota issues (Chrome has 10MB limit)
 const MAX_HIGHLIGHTS = 1000; // Limit highlights
 
 // Installation and updates
