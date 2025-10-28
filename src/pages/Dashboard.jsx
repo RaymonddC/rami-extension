@@ -4,7 +4,6 @@ import { Map, List, Brain, FileText, LayoutGrid, Trash2, MessageCircleIcon  } fr
 import { useSavedReadings, usePreferences } from '../hooks/useChromeStorage';
 import ReactFlowView, { ReactFlowEmptyState } from '../components/ReactFlowView';
 import MermaidView from '../components/MermaidView';
-import HybridView from '../components/HybridView';
 import PersonaSelector from '../components/PersonaSelector';
 import NodeDetailPopover from '../components/NodeDetailPopover';
 import { extractConcepts } from '../utils/summarize';
@@ -232,19 +231,6 @@ export default function Dashboard() {
                                         >
                                             Mermaid
                                         </button>
-                                        <button
-                                            onClick={() => {
-                                                setViewMode('hybrid');
-                                                setPreferences({ ...preferences, mindmapMode: 'hybrid' });
-                                            }}
-                                            className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                                                viewMode === 'hybrid'
-                                                    ? 'bg-primary-500 text-white shadow-md'
-                                                    : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'
-                                            }`}
-                                        >
-                                            Hybrid
-                                        </button>
                                     </div>
                                 </div>
                             )}
@@ -258,10 +244,8 @@ export default function Dashboard() {
                                     />
                                 ) : viewMode === 'reactflow' ? (
                                     <ReactFlowView concepts={concepts} onNodeClick={handleNodeClick} />
-                                ) : viewMode === 'mermaid' ? (
-                                    <MermaidView concepts={concepts} onNodeClick={handleNodeClick} />
                                 ) : (
-                                    <HybridView concepts={concepts} onNodeClick={handleNodeClick} />
+                                    <MermaidView concepts={concepts} onNodeClick={handleNodeClick} />
                                 )}
                             </div>
                         </motion.div>

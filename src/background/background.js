@@ -38,12 +38,6 @@ chrome.runtime.onInstalled.addListener((details) => {
   });
 
   chrome.contextMenus.create({
-    id: 'highlight-text',
-    title: 'Highlight and Analyze',
-    contexts: ['selection'],
-  });
-
-  chrome.contextMenus.create({
     id: 'summarize-selection',
     title: 'Summarize Selection',
     contexts: ['selection'],
@@ -55,10 +49,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   switch (info.menuItemId) {
     case 'save-reading':
       await saveCurrentPage(tab);
-      break;
-
-    case 'highlight-text':
-      await highlightSelection(info, tab);
       break;
 
     case 'summarize-selection':
