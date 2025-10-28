@@ -182,6 +182,7 @@ export default function Popup() {
           title: pageContent.title,
           url: currentTab.url,
           content: pageContent.text,
+          summary: conceptResult.processedText, // AI-processed summary used for mindmap
           timestamp: new Date().toISOString(),
           concepts: conceptResult.concepts,
           generationMethod: conceptResult.method, // Track how it was generated

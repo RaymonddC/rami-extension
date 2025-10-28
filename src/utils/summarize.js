@@ -449,6 +449,22 @@ export async function extractConcepts(text, options = {}) {
     if (DEBUG) console.log(`✅ Analyzing full text: ${processedText.length} characters`);
   }
 
+  // Generate AI summary for display (separate from concept extraction)
+  console.log('📝 Generating AI summary for article...');
+  let aiSummary = null;
+  try {
+    const summaryResult = await summarizeText(processedText, {
+      persona,
+      length: 'long', // Use long format for comprehensive summaries
+    });
+    if (summaryResult.success && summaryResult.summary) {
+      aiSummary = summaryResult.summary;
+      console.log(`✅ AI summary generated (${aiSummary.length} chars)`);
+    }
+  } catch (summaryError) {
+    console.warn('⚠️ Failed to generate AI summary:', summaryError.message);
+  }
+
   // Get persona-specific instructions
   const personaConfig = PERSONAS[persona] || PERSONAS.architect;
   const personaInstructions = getPersonaMindmapInstructions(persona);
@@ -525,7 +541,8 @@ Return ONLY the JSON array. Validate all connection IDs exist!`;
               return {
                 success: true,
                 concepts: validatedConcepts,
-                method: result.method
+                method: result.method,
+                processedText: aiSummary // Include the AI-generated summary
               };
             }
           } else {
@@ -548,7 +565,10 @@ Return ONLY the JSON array. Validate all connection IDs exist!`;
   console.log('🔄 Falling back to enhanced concept extraction');
   const fallbackResult = await mockExtractConcepts(text, options);
   console.log('📊 Fallback returned:', fallbackResult.concepts.length, 'concepts');
-  return fallbackResult;
+  return {
+    ...fallbackResult,
+    processedText: aiSummary // Include the AI-generated summary even in fallback
+  };
 }
 
 /**

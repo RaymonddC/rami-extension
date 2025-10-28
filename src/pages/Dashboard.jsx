@@ -22,6 +22,7 @@ export default function Dashboard() {
     const [concepts, setConcepts] = useState([]);
     const [viewMode, setViewMode] = useState(preferences?.mindmapMode || 'reactflow');
     const [selectedNode, setSelectedNode] = useState(null);
+    const [showingSummary, setShowingSummary] = useState(null); // For summary modal
 
     const handleDeleteReading = async (readingId, event) => {
         event.stopPropagation(); // Prevent selecting the reading when clicking delete
@@ -172,6 +173,7 @@ export default function Dashboard() {
                                 onSelect={setSelectedReading}
                                 selected={selectedReading}
                                 onDelete={handleDeleteReading}
+                                onViewSummary={setShowingSummary}
                             />
                         </motion.div>
                     )}
@@ -298,11 +300,103 @@ export default function Dashboard() {
           allConcepts={concepts}
         />
       )}
+
+      {/* Summary Modal */}
+      {showingSummary && (
+        <SummaryModal
+          reading={showingSummary}
+          onClose={() => setShowingSummary(null)}
+        />
+      )}
         </div>
     );
 }
 
-function ReadingsList({ readings, onSelect, selected, onDelete }) {
+/**
+ * Summary Modal Component
+ */
+function SummaryModal({ reading, onClose }) {
+    return (
+        <AnimatePresence>
+            {/* Backdrop */}
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={onClose}
+                className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+                style={{ zIndex: 9999 }}
+            >
+                {/* Modal */}
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-white dark:bg-neutral-800 rounded-xl shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden"
+                >
+                    {/* Header */}
+                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 text-white flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <span className="text-2xl">🤖</span>
+                            <div>
+                                <h3 className="text-lg font-semibold">AI-Generated Summary</h3>
+                                <p className="text-sm opacity-90">Comprehensive summary created during mindmap generation</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={onClose}
+                            className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                        >
+                            ✕
+                        </button>
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-6 overflow-y-auto max-h-[calc(80vh-100px)]">
+                        <div className="mb-4">
+                            <h4 className="font-semibold text-lg mb-2 text-neutral-900 dark:text-neutral-100">
+                                {reading.title}
+                            </h4>
+                            <div className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+                                <span>Summary: ~{Math.floor(reading.summary.length / 5)} words</span>
+                                {reading.content && (
+                                    <span className="ml-2 opacity-75">
+                                        • Original: ~{Math.floor(reading.content.length / 5)} words
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="prose dark:prose-invert max-w-none">
+                            <div className="whitespace-pre-wrap text-neutral-800 dark:text-neutral-200 leading-relaxed">
+                                {reading.summary}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="px-6 py-4 bg-neutral-50 dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-700 flex justify-between items-center">
+                        <div className="text-xs text-neutral-600 dark:text-neutral-400">
+                            AI-generated comprehensive summary • {reading.generationMethod === 'fallback' ? '📝 Fallback mode' : '🤖 AI-powered'}
+                        </div>
+                        <button
+                            onClick={() => {
+                                navigator.clipboard.writeText(reading.summary);
+                                alert('Summary copied to clipboard!');
+                            }}
+                            className="btn-secondary text-sm"
+                        >
+                            Copy Summary
+                        </button>
+                    </div>
+                </motion.div>
+            </motion.div>
+        </AnimatePresence>
+    );
+}
+
+function ReadingsList({ readings, onSelect, selected, onDelete, onViewSummary }) {
     if (readings.length === 0) {
         return (
             <div className="text-center py-20">
@@ -339,6 +433,21 @@ function ReadingsList({ readings, onSelect, selected, onDelete }) {
                     <p className="text-sm text-neutral-600 dark:text-neutral-400 line-clamp-3 mb-3">
                         {reading.excerpt || reading.content?.substring(0, 150)}
                     </p>
+
+                    {/* Show summary button if exists */}
+                    {reading.summary && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onViewSummary(reading);
+                            }}
+                            className="mb-3 w-full text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-3 py-2 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors flex items-center justify-center gap-1"
+                        >
+                            <span>📄</span>
+                            <span>View AI Summary ({Math.floor(reading.summary.length / 5)} words)</span>
+                        </button>
+                    )}
+
                     <div className="flex items-center justify-between">
                         <div className="text-xs text-neutral-500">
                             {new Date(reading.timestamp).toLocaleDateString()}
