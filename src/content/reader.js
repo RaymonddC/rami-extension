@@ -96,16 +96,16 @@
    */
   function handleKeyboard(event) {
     // Alt+R: Toggle reader mode
-    if (event.altKey && event.key === 'r') {
-      event.preventDefault();
-      toggleReaderMode();
-    }
+    // if (event.altKey && event.key === 'r') {
+    //   event.preventDefault();
+    //   toggleReaderMode();
+    // }
 
     // Alt+H: Highlight selection
-    if (event.altKey && event.key === 'h') {
-      event.preventDefault();
-      highlightCurrentSelection();
-    }
+    // if (event.altKey && event.key === 'h') {
+    //   event.preventDefault();
+    //   highlightCurrentSelection();
+    // }
 
     // Alt+S: Summarize selection
     if (event.altKey && event.key === 's') {
@@ -492,7 +492,6 @@
     toolbar.id = 'ai-reading-toolbar';
     toolbar.className = 'ai-reading-toolbar hidden';
     toolbar.innerHTML = `
-      <button data-action="highlight" title="Highlight (Alt+H)">✏️</button>
       <button data-action="summarize" title="Summarize (Alt+S)">📝</button>
     `;
 
