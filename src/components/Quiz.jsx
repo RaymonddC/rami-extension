@@ -27,6 +27,34 @@ import { generateQuizFromReading } from '../utils/quizGeneration';
  * - Provides educational feedback
  * - Tracks learning progress
  */
+
+/**
+ * FIXED: Smart answer comparison that handles different types
+ * Fixes the issue where correct answers are marked wrong
+ */
+function compareAnswers(userAnswer, correctAnswer) {
+    if (userAnswer === undefined || userAnswer === null) {
+        return false;
+    }
+
+    // For true/false questions
+    if (typeof correctAnswer === 'boolean') {
+        if (typeof userAnswer === 'string') {
+            const normalized = userAnswer.toLowerCase().trim();
+            if (normalized === 'true') return correctAnswer === true;
+            if (normalized === 'false') return correctAnswer === false;
+        }
+        return userAnswer === correctAnswer;
+    }
+
+    // For multiple choice (strings)
+    if (typeof correctAnswer === 'string' && typeof userAnswer === 'string') {
+        return userAnswer.trim().toLowerCase() === correctAnswer.trim().toLowerCase();
+    }
+
+    return userAnswer === correctAnswer;
+}
+
 export default function Quiz({ readings, preferences }) {
     const [selectedReading, setSelectedReading] = useState(null);
     const [quiz, setQuiz] = useState(null);
@@ -163,7 +191,7 @@ export default function Quiz({ readings, preferences }) {
     const progress = ((currentQuestionIndex + 1) / quiz.questions.length) * 100;
     const allQuestionsAnswered = quiz.questions.every(q => answers[q.id] !== undefined);
     const userAnswer = answers[currentQuestion.id];
-    const isCorrect = userAnswer === currentQuestion.correctAnswer;
+    const isCorrect = compareAnswers(userAnswer, currentQuestion.correctAnswer);
 
     return (
         <div className="max-w-4xl mx-auto">
@@ -355,7 +383,7 @@ function QuestionInput({ question, value, onChange, showFeedback, isCorrect }) {
             <div className="space-y-3">
                 {question.options.map((option) => {
                     const isSelected = value === option;
-                    const isCorrectOption = option === question.correctAnswer;
+                    const isCorrectOption = compareAnswers(option, question.correctAnswer);
                     const showCorrect = showFeedback && isCorrectOption;
                     const showWrong = showFeedback && isSelected && !isCorrectOption;
 
@@ -412,7 +440,7 @@ function QuestionInput({ question, value, onChange, showFeedback, isCorrect }) {
             <div className="space-y-3">
                 {[true, false].map((option) => {
                     const isSelected = value === option;
-                    const isCorrectOption = option === question.correctAnswer;
+                    const isCorrectOption = compareAnswers(option, question.correctAnswer);
                     const showCorrect = showFeedback && isCorrectOption;
                     const showWrong = showFeedback && isSelected && !isCorrectOption;
 
@@ -700,7 +728,7 @@ function QuizResults({ quiz, answers, timeElapsed, quizMode, onReset, onRetry })
                 <div className="space-y-4">
                     {quiz.questions.map((question, index) => {
                         const userAnswer = answers[question.id];
-                        const isCorrect = userAnswer === question.correctAnswer;
+                        const isCorrect = compareAnswers(userAnswer, question.correctAnswer);
 
                         return (
                             <div
@@ -809,7 +837,7 @@ function calculateScore(quiz, answers) {
 
     quiz.questions.forEach((question) => {
         const userAnswer = answers[question.id];
-        if (userAnswer === question.correctAnswer) {
+        if (compareAnswers(userAnswer, question.correctAnswer)) {
             correct++;
         }
     });

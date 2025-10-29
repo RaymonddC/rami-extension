@@ -350,52 +350,62 @@ function parseQuizResponse(text) {
 /**
  * Parse questions from text format (fallback)
  */
+/**
+ * Fungsi untuk mem-parsing output teks mentah dari Gemini Nano
+ * menjadi array objek pertanyaan kuis yang terstruktur.
+ * * Asumsi: Teks output dari Nano mengikuti format dasar ini:
+ * Q1: Ini adalah pertanyaan pertama. (A) Opsi A (B) Opsi B (C) Opsi C Answer: B
+ */
 function parseTextFormatQuestions(text) {
     const questions = [];
+    // Pisahkan teks per baris dan hapus baris yang kosong
     const lines = text.split('\n').filter(line => line.trim());
 
     let currentQuestion = null;
-    let optionIndex = 0;
 
     for (const line of lines) {
         const trimmed = line.trim();
 
-        // Question pattern
+        // Regex untuk mendeteksi awal pertanyaan (misal: Q1:, 1., Question 1:)
         if (/^Q\d+:|^\d+\.|^Question \d+:/i.test(trimmed)) {
+            // Simpan pertanyaan sebelumnya jika ada
             if (currentQuestion) {
                 questions.push(currentQuestion);
             }
 
-            // Determine if it's multiple choice or true/false
+            // Tentukan tipe pertanyaan (True/False atau Multiple Choice)
             const isTrueFalse = /\(true\/false\)|true or false/i.test(trimmed);
 
             currentQuestion = {
                 id: `q${questions.length + 1}`,
                 type: isTrueFalse ? 'true-false' : 'multiple-choice',
+
+                // Bersihkan teks pertanyaan dari label Q/Nomor
                 question: trimmed.replace(/^Q\d+:|^\d+\.|^Question \d+:/i, '').trim(),
-                options: [],
+
+                options: [], // Inisialisasi array untuk opsi jawaban
                 correctAnswer: null,
                 explanation: ''
             };
-            optionIndex = 0;
         }
-        // Options for multiple choice
+        // Logika untuk mengidentifikasi Opsi Jawaban (A, B, C, D)
         else if (currentQuestion && currentQuestion.type === 'multiple-choice' && /^[A-D][\):]|^[a-d][\):]/.test(trimmed)) {
             const optionText = trimmed.replace(/^[A-Da-d][\):]/, '').trim();
             currentQuestion.options.push(optionText);
         }
-        // Correct answer
+        // Logika untuk mengidentifikasi Jawaban Benar
         else if (/^Answer:|^Correct:/i.test(trimmed)) {
             const answer = trimmed.replace(/^Answer:|^Correct:/i, '').trim();
             if (currentQuestion) {
                 if (currentQuestion.type === 'true-false') {
+                    // Konversi string 'True' atau 'False' menjadi boolean
                     currentQuestion.correctAnswer = /true/i.test(answer);
                 } else {
-                    currentQuestion.correctAnswer = answer;
+                    currentQuestion.correctAnswer = answer; // Misal: 'A' atau teks jawaban
                 }
             }
         }
-        // Explanation
+        // Logika untuk mengidentifikasi Penjelasan
         else if (/^Explanation:|^Why:/i.test(trimmed)) {
             if (currentQuestion) {
                 currentQuestion.explanation = trimmed.replace(/^Explanation:|^Why:/i, '').trim();
@@ -403,11 +413,31 @@ function parseTextFormatQuestions(text) {
         }
     }
 
+    // Pastikan pertanyaan terakhir (di akhir loop) juga dimasukkan
     if (currentQuestion) {
         questions.push(currentQuestion);
     }
 
     return questions;
+}
+
+/**
+ * Fungsi untuk mengacak dan memilih sejumlah pertanyaan dari array.
+ * @param {Array} questionsArray - Array pertanyaan yang sudah di-parse.
+ * @param {number} questionCount - Jumlah pertanyaan yang ingin dipilih.
+ * @returns {Array} Array pertanyaan yang sudah diacak dan dipilih.
+ */
+function shuffleAndSelectQuestions(questionsArray, questionCount) {
+    if (!questionsArray || questionsArray.length === 0) {
+        return [];
+    }
+
+    // Mengacak urutan array pertanyaan secara in-place
+    // Metode sort dengan Math.random() adalah cara umum untuk shuffle.
+    const shuffled = questionsArray.sort(() => Math.random() - 0.5);
+
+    // Mengambil hanya sejumlah pertanyaan yang diminta
+    return shuffled.slice(0, questionCount);
 }
 
 /**
@@ -505,7 +535,8 @@ async function generateFallbackQuiz(text, questionCount = 5) {
             explanation: 'The content focuses on its main subject and related concepts.',
         });
     }
-
+    // Shuffle for variety
+    return questions.sort(() => Math.random() - 0.5).slice(0, questionCount);
     console.log(`✅ Generated ${questions.length} improved fallback questions`);
     return questions.slice(0, questionCount);
 }
