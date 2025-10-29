@@ -344,12 +344,6 @@ export default function Popup() {
         <div className="p-4 border-t border-neutral-200 dark:border-neutral-700 text-xs text-neutral-500 dark:text-neutral-400">
           <div className="space-y-1">
             <div>
-              💡 <kbd>Alt+R</kbd> - Toggle Reader Mode
-            </div>
-            <div>
-              ✏️ <kbd>Alt+H</kbd> - Highlight Selection
-            </div>
-            <div>
               📝 <kbd>Alt+S</kbd> - Summarize Selection
             </div>
           </div>

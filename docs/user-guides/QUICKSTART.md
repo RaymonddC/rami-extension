@@ -67,7 +67,6 @@ npm run build
 ### Test #3: Use Keyboard Shortcuts
 
 While on any webpage:
-- Press `Alt + R` → Toggle Reader Mode
 - Press `Alt + H` → Highlight selected text
 - Press `Alt + S` → Summarize selection
 
@@ -162,7 +161,6 @@ Then rebuild: `npm run build`
 ### Keyboard Power User
 
 Learn all shortcuts:
-- `Alt + R` - Reader mode
 - `Alt + H` - Highlight
 - `Alt + S` - Summarize
 - `Ctrl + Click on highlight` - Remove highlight

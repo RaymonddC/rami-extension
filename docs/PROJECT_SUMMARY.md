@@ -46,10 +46,8 @@
 - ✅ `src/utils/theme.js` - Theme management
 - ✅ `src/hooks/useChromeStorage.js` - Storage hooks
 
-### Background & Content Scripts (3)
+### Background Scripts (1)
 - ✅ `src/background/background.js` - Service worker
-- ✅ `src/content/reader.js` - Page interaction script
-- ✅ `src/content/reader.css` - Reader mode styles
 
 ### Styles (1)
 - ✅ `src/styles/index.css` - Global styles + Tailwind
