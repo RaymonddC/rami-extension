@@ -1,16 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  BookOpen,
-  Sparkles,
-  Settings,
-  LayoutDashboard,
-  X,
-  Loader2,
-  Copy,
-  CheckCircle,
-  Network,
-} from 'lucide-react';
+import { BookOpen, Sparkles, Settings, LayoutDashboard, X, Loader2, Copy, CheckCircle, Network } from 'lucide-react';
 import { usePreferences, useSavedReadings } from '../hooks/useChromeStorage';
 import { PERSONAS, summarizeText, extractConcepts } from '../utils/summarize';
 
@@ -107,7 +97,7 @@ export default function Popup() {
       setSummary({
         success: false,
         summary: 'Failed to summarize page. Please try again.',
-        method: 'error'
+        method: 'error',
       });
     } finally {
       setLoadingSummary(false);
@@ -145,7 +135,7 @@ export default function Popup() {
           const article = document.querySelector('article') || document.body;
           return {
             text: article.innerText.substring(0, 50000),
-            title: document.title
+            title: document.title,
           };
         },
       });
@@ -153,7 +143,7 @@ export default function Popup() {
       const pageContent = result.result;
       console.log('✅ Page content extracted:', {
         title: pageContent.title,
-        textLength: pageContent.text.length
+        textLength: pageContent.text.length,
       });
 
       // Extract concepts
@@ -166,7 +156,7 @@ export default function Popup() {
       console.log('📊 Concept extraction result:', {
         success: conceptResult.success,
         conceptCount: conceptResult.concepts?.length || 0,
-        method: conceptResult.method
+        method: conceptResult.method,
       });
 
       if (conceptResult.success && conceptResult.concepts && conceptResult.concepts.length > 0) {
@@ -234,30 +224,26 @@ export default function Popup() {
       {/* Header */}
       <div className="bg-gradient-to-r from-primary-500 to-primary-600 p-6 text-white flex-shrink-0">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold">Rami</h1>
-          <button
-            onClick={openOptions}
-            className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-          >
+          <div className="flex items-center gap-3">
+            <div>
+              <h1 className="text-2xl font-bold">Rami</h1>
+              <p className="text-sm text-white/80 -mt-1">Untangle Your Mind</p>
+            </div>
+          </div>
+          <button onClick={openOptions} className="p-2 hover:bg-white/20 rounded-lg transition-colors">
             <Settings className="w-5 h-5" />
           </button>
         </div>
 
         {/* Persona Selector */}
         <div className="relative">
-          <button
-            onClick={() => setShowPersonaDropdown(!showPersonaDropdown)}
-            className="w-full flex items-center gap-3 bg-white/10 hover:bg-white/20 rounded-lg p-3 transition-colors"
-          >
+          <button onClick={() => setShowPersonaDropdown(!showPersonaDropdown)} className="w-full flex items-center gap-3 bg-white/10 hover:bg-white/20 rounded-lg p-3 transition-colors">
             <span className="text-3xl">{currentPersona.icon}</span>
             <div className="flex-1 text-left">
               <div className="text-sm opacity-90">Current Persona</div>
               <div className="font-semibold">{currentPersona.name}</div>
             </div>
-            <motion.div
-              animate={{ rotate: showPersonaDropdown ? 180 : 0 }}
-              transition={{ duration: 0.2 }}
-            >
+            <motion.div animate={{ rotate: showPersonaDropdown ? 180 : 0 }} transition={{ duration: 0.2 }}>
               ▼
             </motion.div>
           </button>
@@ -276,30 +262,16 @@ export default function Popup() {
                     key={persona.id}
                     onClick={() => handlePersonaChange(persona.id)}
                     className={`w-full flex items-center gap-3 p-3 transition-all text-left border-b border-neutral-100 dark:border-neutral-700 last:border-b-0 ${
-                      preferences?.persona === persona.id
-                        ? 'bg-primary-50 dark:bg-primary-900/20'
-                        : 'hover:bg-neutral-50 dark:hover:bg-neutral-700'
+                      preferences?.persona === persona.id ? 'bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-neutral-50 dark:hover:bg-neutral-700'
                     }`}
                   >
                     <span className="text-2xl">{persona.icon}</span>
                     <div className="flex-1 min-w-0">
-                      <div className={`font-semibold text-sm ${
-                        preferences?.persona === persona.id
-                          ? 'text-primary-600 dark:text-primary-400'
-                          : 'text-neutral-900 dark:text-neutral-100'
-                      }`}>
-                        {persona.name}
-                      </div>
-                      <div className="text-xs text-neutral-500 dark:text-neutral-400">
-                        {persona.beverage}
-                      </div>
-                      <div className="text-xs text-neutral-500 dark:text-neutral-400 line-clamp-2 mt-0.5">
-                        {persona.description}
-                      </div>
+                      <div className={`font-semibold text-sm ${preferences?.persona === persona.id ? 'text-primary-600 dark:text-primary-400' : 'text-neutral-900 dark:text-neutral-100'}`}>{persona.name}</div>
+                      <div className="text-xs text-neutral-500 dark:text-neutral-400">{persona.beverage}</div>
+                      <div className="text-xs text-neutral-500 dark:text-neutral-400 line-clamp-2 mt-0.5">{persona.description}</div>
                     </div>
-                    {preferences?.persona === persona.id && (
-                      <CheckCircle className="w-4 h-4 text-primary-500 flex-shrink-0" />
-                    )}
+                    {preferences?.persona === persona.id && <CheckCircle className="w-4 h-4 text-primary-500 flex-shrink-0" />}
                   </button>
                 ))}
               </motion.div>
@@ -309,94 +281,79 @@ export default function Popup() {
       </div>
 
       {/* Summary Panel */}
-      <AnimatePresence>
-        {showSummary && (
-          <SummaryPanel
-            summary={summary}
-            loadingSummary={loadingSummary}
-            onClose={() => setShowSummary(false)}
-            onCopy={copySummary}
-            copied={copied}
-            persona={currentPersona}
-          />
-        )}
-      </AnimatePresence>
+      <AnimatePresence>{showSummary && <SummaryPanel summary={summary} loadingSummary={loadingSummary} onClose={() => setShowSummary(false)} onCopy={copySummary} copied={copied} persona={currentPersona} />}</AnimatePresence>
 
       {/* Quick Actions */}
       <div className="flex-1 overflow-auto">
-      <div className="p-4 space-y-3">
-        <QuickAction
-          icon={<LayoutDashboard className="w-5 h-5" />}
-          label="Open Dashboard"
-          description="View all your saved readings"
-          onClick={openDashboard}
-        />
+        <div className="p-4 space-y-3">
+          <QuickAction icon={<LayoutDashboard className="w-5 h-5" />} label="Open Dashboard" description="View all your saved readings" onClick={openDashboard} />
 
-        <QuickAction
-          icon={loadingSummary ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-          label="Summarize Page"
-          description={loadingSummary ? "Generating summary..." : "Get AI summary of current page"}
-          onClick={summarizePage}
-          disabled={loadingSummary}
-        />
+          <QuickAction
+            icon={loadingSummary ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+            label="Summarize Page"
+            description={loadingSummary ? 'Generating summary...' : 'Get AI summary of current page'}
+            onClick={summarizePage}
+            disabled={loadingSummary}
+          />
 
-        <QuickAction
-          icon={loadingMindmap ? <Loader2 className="w-5 h-5 animate-spin" /> : <Network className="w-5 h-5" />}
-          label="Generate Mindmap"
-          description={loadingMindmap ? "Using AI to generate mindmap (up to 2 min)..." : "Create mindmap from current page"}
-          onClick={() => {
-            if (!loadingMindmap) {
-              console.log('🔘 Button clicked!');
-              generateMindmap();
-            }
-          }}
-          disabled={loadingMindmap}
-        />
-      </div>
-
-      {/* Recent Readings */}
-      <div className="p-4 border-t border-neutral-200 dark:border-neutral-700">
-        <h3 className="font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
-          Recent Readings
-        </h3>
-
-        {readings.length === 0 ? (
-          <div className="text-center py-8 text-neutral-500 dark:text-neutral-400">
-            <BookOpen className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">No saved readings yet</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {readings.slice(0, 3).map((reading) => (
-              <RecentReadingItem
-                key={reading.id}
-                reading={reading}
-                onClick={() => {
-                  chrome.tabs.create({ url: reading.url });
-                }}
-              />
-            ))}
-
-            {readings.length > 3 && (
-              <button
-                onClick={openDashboard}
-                className="w-full text-sm text-primary-500 hover:text-primary-600 py-2"
-              >
-                View all {readings.length} readings →
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Keyboard Shortcuts Hint */}
-      <div className="p-4 border-t border-neutral-200 dark:border-neutral-700 text-xs text-neutral-500 dark:text-neutral-400">
-        <div className="space-y-1">
-          <div>💡 <kbd>Alt+R</kbd> - Toggle Reader Mode</div>
-          <div>✏️ <kbd>Alt+H</kbd> - Highlight Selection</div>
-          <div>📝 <kbd>Alt+S</kbd> - Summarize Selection</div>
+          <QuickAction
+            icon={loadingMindmap ? <Loader2 className="w-5 h-5 animate-spin" /> : <Network className="w-5 h-5" />}
+            label="Generate Mindmap"
+            description={loadingMindmap ? 'Using AI to generate mindmap (up to 2 min)...' : 'Create mindmap from current page'}
+            onClick={() => {
+              if (!loadingMindmap) {
+                console.log('🔘 Button clicked!');
+                generateMindmap();
+              }
+            }}
+            disabled={loadingMindmap}
+          />
         </div>
-      </div>
+
+        {/* Recent Readings */}
+        <div className="p-4 border-t border-neutral-200 dark:border-neutral-700">
+          <h3 className="font-semibold text-neutral-900 dark:text-neutral-100 mb-3">Recent Readings</h3>
+
+          {readings.length === 0 ? (
+            <div className="text-center py-8 text-neutral-500 dark:text-neutral-400">
+              <BookOpen className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No saved readings yet</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {readings.slice(0, 3).map((reading) => (
+                <RecentReadingItem
+                  key={reading.id}
+                  reading={reading}
+                  onClick={() => {
+                    chrome.tabs.create({ url: reading.url });
+                  }}
+                />
+              ))}
+
+              {readings.length > 3 && (
+                <button onClick={openDashboard} className="w-full text-sm text-primary-500 hover:text-primary-600 py-2">
+                  View all {readings.length} readings →
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Keyboard Shortcuts Hint */}
+        <div className="p-4 border-t border-neutral-200 dark:border-neutral-700 text-xs text-neutral-500 dark:text-neutral-400">
+          <div className="space-y-1">
+            <div>
+              💡 <kbd>Alt+R</kbd> - Toggle Reader Mode
+            </div>
+            <div>
+              ✏️ <kbd>Alt+H</kbd> - Highlight Selection
+            </div>
+            <div>
+              📝 <kbd>Alt+S</kbd> - Summarize Selection
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -413,21 +370,13 @@ function QuickAction({ icon, label, description, onClick, disabled = false }) {
       onClick={onClick}
       disabled={disabled}
       className={`w-full flex items-start gap-3 p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 transition-all text-left ${
-        disabled
-          ? 'opacity-60 cursor-not-allowed'
-          : 'hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/10'
+        disabled ? 'opacity-60 cursor-not-allowed' : 'hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/10'
       }`}
     >
-      <div className="flex-shrink-0 w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center text-primary-600 dark:text-primary-400">
-        {icon}
-      </div>
+      <div className="flex-shrink-0 w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center text-primary-600 dark:text-primary-400">{icon}</div>
       <div className="flex-1 min-w-0">
-        <div className="font-medium text-neutral-900 dark:text-neutral-100">
-          {label}
-        </div>
-        <div className="text-xs text-neutral-600 dark:text-neutral-400">
-          {description}
-        </div>
+        <div className="font-medium text-neutral-900 dark:text-neutral-100">{label}</div>
+        <div className="text-xs text-neutral-600 dark:text-neutral-400">{description}</div>
       </div>
     </motion.button>
   );
@@ -438,17 +387,9 @@ function QuickAction({ icon, label, description, onClick, disabled = false }) {
  */
 function RecentReadingItem({ reading, onClick }) {
   return (
-    <motion.button
-      whileHover={{ x: 4 }}
-      onClick={onClick}
-      className="w-full text-left p-2 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-    >
-      <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">
-        {reading.title}
-      </div>
-      <div className="text-xs text-neutral-500 dark:text-neutral-400">
-        {new Date(reading.timestamp).toLocaleDateString()}
-      </div>
+    <motion.button whileHover={{ x: 4 }} onClick={onClick} className="w-full text-left p-2 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
+      <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{reading.title}</div>
+      <div className="text-xs text-neutral-500 dark:text-neutral-400">{new Date(reading.timestamp).toLocaleDateString()}</div>
     </motion.button>
   );
 }
@@ -468,14 +409,9 @@ function SummaryPanel({ summary, loadingSummary, onClose, onCopy, copied, person
       <div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-700">
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-primary-500" />
-          <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">
-            Page Summary
-          </h3>
+          <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">Page Summary</h3>
         </div>
-        <button
-          onClick={onClose}
-          className="p-1 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded transition-colors"
-        >
+        <button onClick={onClose} className="p-1 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded transition-colors">
           <X className="w-5 h-5" />
         </button>
       </div>
@@ -496,24 +432,17 @@ function SummaryPanel({ summary, loadingSummary, onClose, onCopy, copied, person
               <span className="badge badge-primary">
                 {persona.icon} {persona.name}
               </span>
-              <span className="text-neutral-500 dark:text-neutral-400">
-                {isAIMethod(summary.method) ? '🤖 AI' : '📝 Fallback'}
-              </span>
+              <span className="text-neutral-500 dark:text-neutral-400">{isAIMethod(summary.method) ? '🤖 AI' : '📝 Fallback'}</span>
             </div>
 
             {/* Summary Text */}
             <div className="prose prose-sm dark:prose-invert max-w-none">
-              <p className="text-sm text-neutral-900 dark:text-neutral-100 leading-relaxed">
-                {summary.summary}
-              </p>
+              <p className="text-sm text-neutral-900 dark:text-neutral-100 leading-relaxed">{summary.summary}</p>
             </div>
 
             {/* Actions */}
             <div className="flex items-center gap-2 pt-3 border-t border-neutral-200 dark:border-neutral-700">
-              <button
-                onClick={onCopy}
-                className="btn-secondary text-sm flex items-center gap-2"
-              >
+              <button onClick={onCopy} className="btn-secondary text-sm flex items-center gap-2">
                 {copied ? (
                   <>
                     <CheckCircle className="w-4 h-4" />
@@ -527,11 +456,7 @@ function SummaryPanel({ summary, loadingSummary, onClose, onCopy, copied, person
                 )}
               </button>
 
-              {summary.method === 'fallback' && (
-                <div className="flex-1 text-xs text-neutral-500 dark:text-neutral-400">
-                  💡 Enable Chrome AI for better summaries
-                </div>
-              )}
+              {summary.method === 'fallback' && <div className="flex-1 text-xs text-neutral-500 dark:text-neutral-400">💡 Enable Chrome AI for better summaries</div>}
             </div>
           </div>
         ) : null}
