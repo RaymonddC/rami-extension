@@ -580,9 +580,9 @@ function ReadingCard({ reading, onSelect }) {
                     <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
                         {reading.title}
                     </h3>
-                    <p className="text-sm text-neutral-600 dark:text-neutral-400 line-clamp-2 mb-3">
-                        {reading.excerpt || reading.text?.substring(0, 150) + '...'}
-                    </p>
+                    {/*<p className="text-sm text-neutral-600 dark:text-neutral-400 line-clamp-2 mb-3">*/}
+                    {/*    {reading.excerpt || reading.text?.substring(0, 150) + '...'}*/}
+                    {/*</p>*/}
 
                     {/* Summary indicator */}
                     <div className="flex items-center gap-3 mb-4">

@@ -1,6 +1,6 @@
 /**
- * Enhanced Quiz Generation Utility
- * Generates high-quality quiz questions based on AI summaries and reading content
+ * FIXED Quiz Generation Utility
+ * Generates appropriate quiz questions - no more broken True/False questions!
  */
 
 import { queryLanguageModel } from './summarize.js';
@@ -154,8 +154,8 @@ Provide a clear, structured summary that highlights:
 }
 
 /**
- * Generate questions using both summary and content
- * This creates more focused, educational questions
+ * FIXED: Generate questions using both summary and content
+ * This creates appropriate question types - no more nonsensical True/False!
  */
 async function generateQuestionsFromSummaryAndContent(
     content,
@@ -168,17 +168,14 @@ async function generateQuestionsFromSummaryAndContent(
     const difficultySettings = {
         easy: {
             description: 'straightforward recall questions',
-            questionTypes: ['multiple-choice', 'true-false'],
             focusOn: 'basic facts and main ideas',
         },
         medium: {
             description: 'questions requiring understanding and application',
-            questionTypes: ['multiple-choice', 'true-false', 'code-test'],
             focusOn: 'concepts, relationships, and implications',
         },
         hard: {
             description: 'analytical and synthesis questions',
-            questionTypes: ['multiple-choice', 'true-false', 'code-test'],
             focusOn: 'analysis, evaluation, and connections between ideas',
         },
     };
@@ -191,10 +188,10 @@ async function generateQuestionsFromSummaryAndContent(
     // Better code detection
     const hasCode = /```[\s\S]*?```|`[^`]+`|function\s+\w+|const\s+\w+\s*=|class\s+\w+|def\s+\w+|public\s+\w+/i.test(content);
 
-    // Adjust question distribution based on content
-    const mcRatio = hasCode ? 0.4 : 0.6;
-    const tfRatio = hasCode ? 0.3 : 0.4;
-    const codeRatio = hasCode ? 0.3 : 0;
+    // FIXED: Better question distribution
+    // Prioritize multiple-choice, use True/False sparingly and only for factual statements
+    const mcRatio = 0.7; // 70% multiple choice
+    const tfRatio = 0.3; // 30% true/false (only for clear factual statements)
 
     const prompt = `You are an expert educator creating a quiz to help students learn and retain information.
 
@@ -207,317 +204,222 @@ ${content.substring(0, 2500)}
 Create EXACTLY ${requestedCount} high-quality quiz questions that are ${settings.description}.
 Focus on ${settings.focusOn}.
 
+CRITICAL RULES FOR QUESTION TYPES:
+1. MULTIPLE-CHOICE (Preferred - ~70%):
+   - Use for "What is X?", "How does Y work?", "Which of the following..."
+   - Perfect for definitions, concepts, processes, comparisons
+   - Provide 4 distinct, plausible options
+   
+2. TRUE/FALSE (Use sparingly - ~30%, ONLY for clear factual statements):
+   - ONLY use when the content makes a clear, binary factual claim
+   - Examples of GOOD True/False:
+     * "Python is a programming language" (factual statement)
+     * "The process requires three steps" (countable fact)
+     * "This technique was invented in 1995" (verifiable fact)
+   - Examples of BAD True/False (DO NOT CREATE THESE):
+     * "What is artificial intelligence?" (This is a DEFINITION question - use multiple-choice!)
+     * "How does machine learning work?" (This is a PROCESS question - use multiple-choice!)
+     * "Why is X important?" (This is an EXPLANATION question - use multiple-choice!)
+   - If a question starts with "What", "How", "Why", "Which" - IT CANNOT BE TRUE/FALSE!
+
 QUESTION TYPE DISTRIBUTION:
-- ${Math.ceil(requestedCount * mcRatio)} multiple-choice questions
-- ${Math.floor(requestedCount * tfRatio)} true-false questions${hasCode ? `
-- ${Math.floor(requestedCount * codeRatio)} code-test questions` : ''}
+- ${Math.ceil(requestedCount * mcRatio)} multiple-choice questions (for definitions, concepts, processes)
+- ${Math.floor(requestedCount * tfRatio)} true-false questions (ONLY for clear factual statements that can be true or false)
 
-CRITICAL REQUIREMENTS - FOLLOW EXACTLY:
-
-MULTIPLE CHOICE RULES:
-1. MUST have EXACTLY 4 options (A, B, C, D)
-2. Options MUST be complete phrases or sentences (NOT single words like "javascript", "node", "server")
-3. All 4 options must be DIFFERENT and plausible
-4. Only ONE option is correct
-5. Wrong options should be reasonable but clearly incorrect
-6. Question must be a complete, clear sentence
-
-TRUE/FALSE RULES:
-1. Create CLEAR statements that are definitively true or false
-2. Balance true and false answers (don't make all true or all false)
-3. Avoid ambiguous statements
-4. Base on specific facts from the content
-${hasCode ? `
-CODE COMPREHENSION RULES (type: "multiple-choice"):
-1. Include actual code snippet in the question text (use backticks)
-2. Ask about: output, return value, bugs, or purpose
-3. MUST have EXACTLY 4 options (like regular multiple-choice)
-4. Test understanding of code logic, not syntax memorization
-5. Format: "What does this code output? \`code here\`"
-6. Options should be specific answers (numbers, strings, error messages)` : ''}
-
-EXPLANATION RULES:
-1. MUST be at least 2-3 sentences long
-2. Explain WHY the correct answer is right
-3. For multiple choice: explain why other options are wrong
-4. For code questions: explain what the code actually does
-5. Be educational and help students learn
-
-QUESTION QUALITY:
-✓ Complete grammatical sentences
-✓ Specific to the content provided
-✓ Test understanding, not just memory
-✓ Make sense when read aloud
-✗ Avoid fragments like "According to text: ___?"
-✗ Avoid single-word options
-✗ Avoid vague questions
-
-GOOD EXAMPLES:
-
-Multiple Choice:
-Q: "What is the primary purpose of Node.js according to the article?"
-Options:
-- "It allows JavaScript to run on the server side"
-- "It replaces the need for databases in web applications"
-- "It automatically optimizes website loading speed"
-- "It is exclusively used for front-end development"
-Correct: "It allows JavaScript to run on the server side"
-
-True/False:
-Q: "Node.js is built on Chrome's V8 JavaScript engine."
-Correct: true
-
-Q: "Node.js can only be used for server-side applications."
-Correct: false
-${hasCode ? `
-Code Comprehension (type: "multiple-choice"):
-Q: "What will this code output? \`const arr = [1, 2, 3]; console.log(arr.map(x => x * 2));\`"
-Options:
-- "[2, 4, 6]"
-- "[1, 2, 3]"
-- "6"
-- "undefined"
-Correct: "[2, 4, 6]"
-
-Q: "In this code: \`if (x = 5) { console.log('yes'); }\` what is the bug?"
-Options:
-- "Should use == or === instead of ="
-- "Missing semicolon"
-- "console.log syntax is wrong"
-- "No bug present"
-Correct: "Should use == or === instead of ="` : ''}
-
-BAD EXAMPLES (DO NOT DO THIS):
-❌ Q: "According to the text: Differences between Node?"
-❌ Options: ["javascript", "server", "node", "with"]
-❌ Q: "What is mentioned?"
-❌ Explanation: "It's correct." (too short)
-
-Return ONLY valid JSON (no markdown, no extra text):
+FORMAT YOUR RESPONSE AS VALID JSON:
 {
   "questions": [
     {
       "id": "q1",
       "type": "multiple-choice",
-      "question": "What is the primary advantage of using Node.js for server-side development?",
-      "options": [
-        "It allows JavaScript to run on the server",
-        "It makes websites load faster automatically",
-        "It eliminates the need for databases",
-        "It only works with specific browsers"
-      ],
-      "correctAnswer": "It allows JavaScript to run on the server",
-      "explanation": "Node.js's primary advantage is that it enables JavaScript to run on the server, allowing developers to use the same language for both front-end and back-end development. The other options are either incorrect or not the main purpose of Node.js."
+      "question": "What is the primary purpose of...",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctAnswer": "Option A",
+      "explanation": "Detailed explanation of why this is correct..."
     },
     {
       "id": "q2",
       "type": "true-false",
-      "question": "Node.js is built on Chrome's V8 JavaScript engine.",
-      "correctAnswer": true,
-      "explanation": "This is TRUE. Node.js uses Chrome's V8 engine to execute JavaScript code outside of a browser environment, which is a key architectural decision that enables its performance."
-    }${hasCode ? `,
-    {
-      "id": "q3",
-      "type": "code-test",
-      "question": "What will this code output?",
-      "code": "const arr = [1, 2, 3];\\nconst result = arr.map(x => x * 2);\\nconsole.log(result);",
-      "codeLanguage": "javascript",
-      "options": [
-        "[2, 4, 6]",
-        "[1, 2, 3]",
-        "6",
-        "undefined"
-      ],
-      "correctAnswer": "[2, 4, 6]",
-      "explanation": "The map() function creates a new array by applying the callback function to each element. In this case, it multiplies each number by 2, resulting in [2, 4, 6]. The other options are incorrect because map() returns a new array, not the original array, a sum, or undefined."
-    }` : ''}
-  ]
-}
-      "options": [
-        "It allows JavaScript to run on the server",
-        "It makes websites load faster automatically",
-        "It eliminates the need for databases",
-        "It only works with specific browsers"
-      ],
-      "correctAnswer": "It allows JavaScript to run on the server",
-      "explanation": "Node.js's primary advantage is that it enables JavaScript to run on the server, allowing developers to use the same language for both front-end and back-end development. The other options are either incorrect or not the main purpose of Node.js."
-    },
-    {
-      "id": "q2",
-      "type": "true-false",
-      "question": "Node.js is built on Chrome's V8 JavaScript engine.",
-      "correctAnswer": true,
-      "explanation": "This is TRUE. Node.js uses Chrome's V8 engine to execute JavaScript code outside of a browser environment, which is a key architectural decision that enables its performance."
-    },
-    {
-      "id": "q3",
-      "type": "true-false", 
-      "question": "Node.js can only be used for front-end web development.",
+      "question": "Machine learning algorithms require labeled training data",
       "correctAnswer": false,
-      "explanation": "This is FALSE. Node.js is specifically designed for server-side (back-end) development, not front-end development. It enables JavaScript to run on servers, complementing front-end JavaScript frameworks."
+      "explanation": "This is false because unsupervised learning algorithms don't require labeled data..."
     }
   ]
 }
 
-IMPORTANT: 
-- Make explanations educational and detailed (2-3 sentences minimum)
-- Ensure EVERY question is a complete, sensible sentence
-- For multiple choice, all options should be complete phrases, not single words
-- Test understanding of key concepts from the summary
-- Ensure all questions can be definitively answered from the content
-- Double-check that questions make sense when read aloud`;
+QUALITY REQUIREMENTS:
+- All questions must be clear and unambiguous
+- Multiple-choice options must be distinct and plausible
+- True/False questions must be statements that can clearly be evaluated as true or false
+- Explanations should teach, not just state the answer
+- Questions should test understanding, not just memorization
+- Focus on the most important concepts from the content
 
+Generate ${requestedCount} questions now:`;
+
+    console.log('📤 Sending quiz generation prompt...');
+
+    const result = await queryAI(prompt, {
+        persona,
+        temperature: 0.7,
+        maxTokens: 3000,
+    });
+
+    if (!result.success) {
+        throw new Error(`Failed to generate questions: ${result.error}`);
+    }
+
+    console.log('📥 Received AI response');
+
+    // Parse the response
+    let questions = parseQuizResponse(result.text);
+
+    // VALIDATION: Filter out bad questions
+    questions = questions.filter(q => {
+        // Remove True/False questions that are actually definition questions
+        if (q.type === 'true-false') {
+            const questionLower = q.question.toLowerCase();
+            // Bad patterns for True/False
+            if (questionLower.startsWith('what is') ||
+                questionLower.startsWith('what are') ||
+                questionLower.startsWith('how does') ||
+                questionLower.startsWith('how do') ||
+                questionLower.startsWith('why is') ||
+                questionLower.startsWith('why are') ||
+                questionLower.startsWith('which of') ||
+                questionLower.includes('define ') ||
+                questionLower.includes('explain ')) {
+                console.log('⚠️ Filtered out bad True/False question:', q.question);
+                return false;
+            }
+        }
+
+        // Validate multiple-choice has enough options
+        if (q.type === 'multiple-choice' && (!q.options || q.options.length < 3)) {
+            console.log('⚠️ Filtered out multiple-choice with too few options');
+            return false;
+        }
+
+        return true;
+    });
+
+    // If we filtered out too many, regenerate or use fallback
+    if (questions.length < questionCount * 0.6) {
+        console.warn('⚠️ Too many questions filtered, using fallback generation');
+        throw new Error('Generated questions did not meet quality standards');
+    }
+
+    console.log(`✅ Validated ${questions.length} high-quality questions`);
+
+    // Return only the requested number
+    return questions.slice(0, questionCount);
+}
+
+/**
+ * Parse quiz response from AI
+ * Handles various response formats
+ */
+function parseQuizResponse(text) {
     try {
-        const result = await queryAI(prompt, {
-            persona,
-            temperature: 0.5,
-            maxTokens: 2000,
-        });
-
-        console.log('📊 AI Response:', result);
-
-        if (!result || !result.success) {
-            const errorMsg = result?.error || 'Failed to query language model';
-            console.error('❌ AI query failed:', errorMsg);
-            throw new Error(errorMsg);
+        // Try to find JSON in the response
+        const jsonMatch = text.match(/\{[\s\S]*"questions"[\s\S]*\}/);
+        if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (parsed.questions && Array.isArray(parsed.questions)) {
+                return parsed.questions;
+            }
         }
 
-        // result.text is guaranteed to exist and be a string by queryAI wrapper
-        const text = result.text;
-
-        // Parse JSON response
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
-            console.error('❌ No JSON found in response:', text.substring(0, 500));
-            throw new Error('No valid JSON found in response');
+        // Try parsing the entire text as JSON
+        const parsed = JSON.parse(text);
+        if (parsed.questions && Array.isArray(parsed.questions)) {
+            return parsed.questions;
         }
 
-        const parsed = JSON.parse(jsonMatch[0]);
-
-        if (!parsed.questions || !Array.isArray(parsed.questions)) {
-            throw new Error('Invalid question format');
-        }
-
-        // Validate and clean questions
-        const validQuestions = parsed.questions
-            .filter(q => {
-                // Must have required fields
-                if (!q.question || !q.correctAnswer || !q.explanation || !q.type) {
-                    console.warn('⚠️ Skipping invalid question (missing fields):', q);
-                    return false;
-                }
-
-                // Only accept multiple-choice, true-false, and code-test
-                if (q.type !== 'multiple-choice' && q.type !== 'true-false' && q.type !== 'code-test') {
-                    console.warn('⚠️ Skipping unsupported question type:', q.type);
-                    return false;
-                }
-
-                // Question must be a complete sentence (minimum length and ends with punctuation)
-                if (q.question.length < 15) {
-                    console.warn('⚠️ Skipping question that is too short:', q.question);
-                    return false;
-                }
-
-                // Question should make sense (not just fragments)
-                const questionLower = q.question.toLowerCase();
-                if (questionLower.includes('___') ||
-                    questionLower.match(/^according to the text:[\s\w]{0,30}\?$/i)) {
-                    console.warn('⚠️ Skipping nonsensical question:', q.question);
-                    return false;
-                }
-
-                // Multiple choice must have EXACTLY 4 valid options
-                if (q.type === 'multiple-choice' || q.type === 'code-test') {
-                    if (!Array.isArray(q.options) || q.options.length !== 4) {
-                        console.warn('⚠️ Skipping question (must have exactly 4 options):', q);
-                        return false;
-                    }
-
-                    // Options should not be single words (unless they're acronyms or proper nouns)
-                    const hasBadOptions = q.options.some(opt => {
-                        const words = opt.trim().split(/\s+/);
-                        return words.length === 1 && words[0].length < 10 && words[0].toLowerCase() === words[0];
-                    });
-
-                    if (hasBadOptions) {
-                        console.warn('⚠️ Skipping question with single-word options:', q);
-                        return false;
-                    }
-
-                    if (!q.options.includes(q.correctAnswer)) {
-                        console.warn('⚠️ Skipping question where correct answer not in options:', q);
-                        return false;
-                    }
-
-                    // Check for duplicate options
-                    const uniqueOptions = new Set(q.options);
-                    if (uniqueOptions.size !== 4) {
-                        console.warn('⚠️ Skipping question with duplicate options:', q);
-                        return false;
-                    }
-
-                    // Code-test specific validation
-                    if (q.type === 'code-test') {
-                        if (!q.code || q.code.length < 10) {
-                            console.warn('⚠️ Skipping code-test without valid code:', q);
-                            return false;
-                        }
-                        if (!q.codeLanguage) {
-                            console.warn('⚠️ Skipping code-test without language specified:', q);
-                            return false;
-                        }
-                    }
-                }
-
-                // True-false must have boolean answer
-                if (q.type === 'true-false') {
-                    if (typeof q.correctAnswer !== 'boolean') {
-                        console.warn('⚠️ Skipping true-false with non-boolean answer:', q);
-                        return false;
-                    }
-                }
-
-                // Explanation should be substantial
-                if (q.explanation.length < 20) {
-                    console.warn('⚠️ Skipping question with too short explanation:', q);
-                    return false;
-                }
-
-                return true;
-            })
-            .map((q, index) => ({
-                ...q,
-                id: q.id || `q${index + 1}`,
-            }))
-            .slice(0, questionCount); // Take only the requested count
-
-        // If we got less than requested questions, the quality is too poor
-        if (validQuestions.length < questionCount) {
-            throw new Error(`Only ${validQuestions.length} valid questions generated out of ${questionCount} requested - quality too low`);
-        }
-
-        console.log(`✅ Generated ${validQuestions.length} valid questions (filtered from ${parsed.questions.length} total)`);
-        return validQuestions;
+        throw new Error('No questions array found in response');
 
     } catch (error) {
-        console.error('❌ Error generating questions:', error);
-        throw error;
+        console.error('❌ Failed to parse JSON response:', error);
+        console.log('Raw response:', text.substring(0, 500));
+
+        // Fallback: Try to parse questions from text format
+        return parseTextFormatQuestions(text);
     }
 }
 
 /**
- * Fallback quiz generation for when AI fails
- * Creates basic but sensible questions from content
+ * Parse questions from text format (fallback)
+ */
+function parseTextFormatQuestions(text) {
+    const questions = [];
+    const lines = text.split('\n').filter(line => line.trim());
+
+    let currentQuestion = null;
+    let optionIndex = 0;
+
+    for (const line of lines) {
+        const trimmed = line.trim();
+
+        // Question pattern
+        if (/^Q\d+:|^\d+\.|^Question \d+:/i.test(trimmed)) {
+            if (currentQuestion) {
+                questions.push(currentQuestion);
+            }
+
+            // Determine if it's multiple choice or true/false
+            const isTrueFalse = /\(true\/false\)|true or false/i.test(trimmed);
+
+            currentQuestion = {
+                id: `q${questions.length + 1}`,
+                type: isTrueFalse ? 'true-false' : 'multiple-choice',
+                question: trimmed.replace(/^Q\d+:|^\d+\.|^Question \d+:/i, '').trim(),
+                options: [],
+                correctAnswer: null,
+                explanation: ''
+            };
+            optionIndex = 0;
+        }
+        // Options for multiple choice
+        else if (currentQuestion && currentQuestion.type === 'multiple-choice' && /^[A-D][\):]|^[a-d][\):]/.test(trimmed)) {
+            const optionText = trimmed.replace(/^[A-Da-d][\):]/, '').trim();
+            currentQuestion.options.push(optionText);
+        }
+        // Correct answer
+        else if (/^Answer:|^Correct:/i.test(trimmed)) {
+            const answer = trimmed.replace(/^Answer:|^Correct:/i, '').trim();
+            if (currentQuestion) {
+                if (currentQuestion.type === 'true-false') {
+                    currentQuestion.correctAnswer = /true/i.test(answer);
+                } else {
+                    currentQuestion.correctAnswer = answer;
+                }
+            }
+        }
+        // Explanation
+        else if (/^Explanation:|^Why:/i.test(trimmed)) {
+            if (currentQuestion) {
+                currentQuestion.explanation = trimmed.replace(/^Explanation:|^Why:/i, '').trim();
+            }
+        }
+    }
+
+    if (currentQuestion) {
+        questions.push(currentQuestion);
+    }
+
+    return questions;
+}
+
+/**
+ * IMPROVED Fallback quiz generation
+ * Focuses on creating proper multiple-choice questions
  */
 async function generateFallbackQuiz(text, questionCount = 5) {
-    console.log('🔄 Using fallback quiz generation');
+    console.log('🔄 Using improved fallback quiz generation...');
 
-    // Extract sentences
-    const sentences = text
-        .split(/[.!?]+/)
-        .map(s => s.trim())
-        .filter(s => s.length > 30 && s.length < 300 && !s.includes('http'));
+    // Clean and prepare text
+    const cleanText = text.replace(/\s+/g, ' ').trim();
+    const sentences = cleanText.split(/[.!?]+/).filter(s => s.trim().length > 20);
 
     if (sentences.length < 3) {
         throw new Error('Not enough content to generate fallback quiz (need at least 3 complete sentences)');
@@ -525,131 +427,86 @@ async function generateFallbackQuiz(text, questionCount = 5) {
 
     const questions = [];
 
-    // Strategy 1: Create comprehension questions from clear statements
-    const statements = sentences.filter(s => {
-        const lower = s.toLowerCase();
-        return (lower.includes('is') || lower.includes('are') || lower.includes('was') ||
-                lower.includes('means') || lower.includes('refers to')) &&
-            !lower.includes('?') &&
-            s.split(' ').length >= 5;
-    });
+    // Strategy 1: Create multiple-choice questions from key concepts
+    const keyPhrases = extractKeyPhrases(text, 15);
 
-    // Strategy 1: Create true/false from clear factual statements
-    let questionsMade = 0;
-    if (questionsMade < questionCount && statements.length > questionsMade) {
-        for (let i = questionsMade; i < Math.min(questionCount, statements.length); i++) {
-            const statement = statements[i];
+    for (let i = 0; i < Math.min(questionCount, keyPhrases.length); i++) {
+        const keyPhrase = keyPhrases[i];
+        const relevantSentence = sentences.find(s =>
+            s.toLowerCase().includes(keyPhrase.toLowerCase())
+        );
 
-            // Randomly make some statements false by modifying them
-            const isTrue = Math.random() > 0.5;
-            let questionStatement = statement;
-            let explanation = '';
+        if (relevantSentence) {
+            // Create distractor options from other key phrases
+            const distractors = keyPhrases
+                .filter(p => p !== keyPhrase)
+                .slice(0, 3)
+                .map(p => p.charAt(0).toUpperCase() + p.slice(1));
 
-            if (isTrue) {
-                explanation = `This statement is TRUE. It appears in the original content: "${statement}". This represents a key point from the material.`;
-            } else {
-                // Make it false by adding a negation or changing a word
-                if (statement.toLowerCase().includes(' is ')) {
-                    questionStatement = statement.replace(/ is /i, ' is not ');
-                    explanation = `This statement is FALSE. The original text states: "${statement}", without the negation. Pay attention to key words like "is" vs "is not".`;
-                } else if (statement.toLowerCase().includes(' are ')) {
-                    questionStatement = statement.replace(/ are /i, ' are not ');
-                    explanation = `This statement is FALSE. The original text states: "${statement}", without the negation.`;
-                } else if (statement.toLowerCase().includes(' can ')) {
-                    questionStatement = statement.replace(/ can /i, ' cannot ');
-                    explanation = `This statement is FALSE. The original text says "${statement}", which means the opposite.`;
-                } else {
-                    // If we can't easily make it false, make it true
-                    isTrue = true;
-                    explanation = `This statement is TRUE. It appears in the original content: "${statement}".`;
-                }
-            }
+            const correctAnswer = keyPhrase.charAt(0).toUpperCase() + keyPhrase.slice(1);
+
+            questions.push({
+                id: `q${questions.length + 1}`,
+                type: 'multiple-choice',
+                question: `Based on the content, which of the following best relates to: "${relevantSentence.substring(0, 80)}..."?`,
+                options: [correctAnswer, ...distractors].sort(() => Math.random() - 0.5),
+                correctAnswer: correctAnswer,
+                explanation: `The text specifically discusses "${keyPhrase}" in this context.`,
+            });
+        }
+    }
+
+    // Strategy 2: Only add True/False if we have clear factual statements
+    // AND if we still need more questions
+    if (questions.length < questionCount) {
+        const factualStatements = sentences.filter(s => {
+            const lower = s.toLowerCase();
+            // Look for sentences that make clear factual claims
+            return (
+                (lower.includes(' is a ') || lower.includes(' are ') ||
+                    lower.includes(' was ') || lower.includes(' were ')) &&
+                !lower.startsWith('what') &&
+                !lower.startsWith('how') &&
+                !lower.startsWith('why') &&
+                s.split(' ').length >= 6 &&
+                s.split(' ').length <= 20
+            );
+        });
+
+        const neededQuestions = questionCount - questions.length;
+        const tfToAdd = Math.min(neededQuestions, Math.floor(factualStatements.length / 2));
+
+        for (let i = 0; i < tfToAdd; i++) {
+            const statement = factualStatements[i];
 
             questions.push({
                 id: `q${questions.length + 1}`,
                 type: 'true-false',
-                question: questionStatement,
-                correctAnswer: isTrue,
-                explanation: explanation,
+                question: statement.trim(),
+                correctAnswer: true,
+                explanation: `This statement is true according to the source material.`,
             });
-            questionsMade++;
         }
     }
 
-    // Strategy 2: If still need more questions, create multiple choice
-    if (questionsMade < questionCount) {
-        // Find important nouns/terms
-        const words = text.toLowerCase().match(/\b[a-z]{4,15}\b/g) || [];
-        const frequency = {};
-        words.forEach(word => {
-            // Skip common words
-            if (!['that', 'this', 'with', 'from', 'have', 'been', 'were', 'they', 'them', 'what', 'when', 'where'].includes(word)) {
-                frequency[word] = (frequency[word] || 0) + 1;
-            }
-        });
-
-        const importantTerms = Object.entries(frequency)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 10)
-            .map(([word]) => word);
-
-        // Find sentences that mention these terms
-        for (let i = 0; i < Math.min(3, importantTerms.length) && questionsMade < questionCount; i++) {
-            const term = importantTerms[i];
-            const relevantSentence = sentences.find(s =>
-                s.toLowerCase().includes(term) && s.length > 40
-            );
-
-            if (relevantSentence) {
-                // Create multiple choice question
-                const otherTerms = importantTerms
-                    .filter(t => t !== term)
-                    .slice(0, 3)
-                    .map(t => t.charAt(0).toUpperCase() + t.slice(1));
-
-                questions.push({
-                    id: `q${questions.length + 1}`,
-                    type: 'multiple-choice',
-                    question: `According to the text, which concept is discussed in relation to: "${relevantSentence.substring(0, 80)}..."?`,
-                    options: [
-                        term.charAt(0).toUpperCase() + term.slice(1),
-                        ...otherTerms
-                    ].sort(() => Math.random() - 0.5),
-                    correctAnswer: term.charAt(0).toUpperCase() + term.slice(1),
-                    explanation: `The text specifically mentions "${term}" in this context: "${relevantSentence}". This is a key concept from the material.`,
-                });
-                questionsMade++;
-            }
-        }
-    }
-
-    // Final fallback: if still not enough, create summary questions
-    if (questions.length < 2) {
-        // Create at least 2 basic questions
+    // Final fallback: if still not enough, create basic comprehension questions
+    while (questions.length < Math.max(2, questionCount)) {
         questions.push({
-            id: 'q1',
-            type: 'true-false',
-            question: `The text discusses topics related to its main subject matter.`,
-            correctAnswer: true,
-            explanation: 'Based on a review of the content, this covers relevant topics for the subject area.',
-        });
-
-        questions.push({
-            id: 'q2',
+            id: `q${questions.length + 1}`,
             type: 'multiple-choice',
-            question: 'Based on the content, which of the following represents a key concept from the text?',
+            question: 'Which of the following represents a key concept from the reading?',
             options: [
-                sentences[0]?.substring(0, 60) + '...' || 'Main concept from the reading',
+                'The main topic discussed in the content',
                 'An unrelated concept',
-                'Another unrelated topic',
-                'A different subject matter'
+                'A different subject matter',
+                'An irrelevant topic'
             ],
-            correctAnswer: sentences[0]?.substring(0, 60) + '...' || 'Main concept from the reading',
-            explanation: 'The text contains several important points. This represents one of the key concepts discussed.',
+            correctAnswer: 'The main topic discussed in the content',
+            explanation: 'The content focuses on its main subject and related concepts.',
         });
     }
 
-    console.log(`✅ Generated ${questions.length} fallback questions`);
+    console.log(`✅ Generated ${questions.length} improved fallback questions`);
     return questions.slice(0, questionCount);
 }
 
@@ -667,11 +524,18 @@ function extractKeyPhrases(text, maxPhrases = 20) {
     // Get word frequency
     const frequency = {};
     words.forEach(word => {
-        frequency[word] = (frequency[word] || 0) + 1;
+        // Skip common words
+        const commonWords = ['that', 'this', 'with', 'from', 'have', 'been', 'were',
+            'they', 'them', 'what', 'when', 'where', 'which', 'there',
+            'their', 'would', 'could', 'should', 'about', 'other'];
+        if (!commonWords.includes(word)) {
+            frequency[word] = (frequency[word] || 0) + 1;
+        }
     });
 
     // Get top frequent words
     const topWords = Object.entries(frequency)
+        .filter(([word, count]) => count >= 2) // Must appear at least twice
         .sort((a, b) => b[1] - a[1])
         .slice(0, maxPhrases)
         .map(([word]) => word);
@@ -681,7 +545,6 @@ function extractKeyPhrases(text, maxPhrases = 20) {
     const capitalizedWords = [];
 
     sentences.forEach(sentence => {
-        // Add null check and ensure sentence is a string
         if (sentence && typeof sentence === 'string' && sentence.trim().length > 0) {
             const matches = sentence.match(/\b[A-Z][a-z]+\b/g);
             if (matches) {
@@ -711,7 +574,7 @@ export function validateQuiz(quiz) {
     for (let i = 0; i < quiz.questions.length; i++) {
         const q = quiz.questions[i];
 
-        if (!q.id || !q.question || !q.correctAnswer) {
+        if (!q.id || !q.question || q.correctAnswer === undefined) {
             return {
                 valid: false,
                 error: `Question ${i + 1} missing required fields (id, question, correctAnswer)`
@@ -723,6 +586,34 @@ export function validateQuiz(quiz) {
                 return {
                     valid: false,
                     error: `Question ${i + 1} has invalid options`
+                };
+            }
+
+            // Check that correctAnswer is in options
+            if (!q.options.includes(q.correctAnswer)) {
+                return {
+                    valid: false,
+                    error: `Question ${i + 1} correct answer not in options`
+                };
+            }
+        }
+
+        if (q.type === 'true-false') {
+            // Validate it's not a "What/How/Why" question
+            const questionLower = q.question.toLowerCase();
+            if (questionLower.startsWith('what ') ||
+                questionLower.startsWith('how ') ||
+                questionLower.startsWith('why ')) {
+                return {
+                    valid: false,
+                    error: `Question ${i + 1} is an invalid True/False question (starts with What/How/Why)`
+                };
+            }
+
+            if (typeof q.correctAnswer !== 'boolean') {
+                return {
+                    valid: false,
+                    error: `Question ${i + 1} True/False must have boolean correctAnswer`
                 };
             }
         }

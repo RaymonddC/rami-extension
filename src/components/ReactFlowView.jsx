@@ -291,11 +291,11 @@ export function ReactFlowEmptyState({ onGenerate, hasReadings = true }) {
             <p className="text-neutral-600 dark:text-neutral-400 mb-6">
               Generate a mindmap from your reading to visualize key concepts and their connections.
             </p>
-            {onGenerate && (
-              <button onClick={onGenerate} className="btn-primary">
-                Generate Mindmap
-              </button>
-            )}
+            {/*{onGenerate && (*/}
+            {/*  <button onClick={onGenerate} className="btn-primary">*/}
+            {/*    Generate Mindmap*/}
+            {/*  </button>*/}
+            {/*)}*/}
           </>
         ) : (
           <>
