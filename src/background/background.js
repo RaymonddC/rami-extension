@@ -113,6 +113,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
  */
 async function saveCurrentPage(tab) {
   try {
+    // Inject content script if needed
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['src/content/reader.js'],
+    });
+
     // Get page content
     const [result] = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
@@ -202,6 +208,13 @@ async function highlightSelection(info, tab) {
     }
 
     await chrome.storage.local.set({ highlights });
+
+    // Inject content script to visually highlight
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: addHighlightToPage,
+      args: [info.selectionText],
+    });
 
     chrome.notifications.create({
       type: 'basic',

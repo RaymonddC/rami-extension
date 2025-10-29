@@ -25,6 +25,17 @@
       "128": "icons/icon128.png"
     }
   },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "exclude_matches": [
+        "*://chrome.google.com/*",
+        "*://chromewebstore.google.com/*"
+      ],
+      "js": ["src/content/reader.js"],
+      "css": ["src/content/reader.css"]
+    }
+  ],
   "options_page": "options.html",
   "icons": {
     "16": "icons/icon16.png",
@@ -33,7 +44,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["src/utils/summarize.js"],
+      "resources": ["src/content/*.js", "src/content/*.css", "src/utils/summarize.js"],
       "matches": ["<all_urls>"]
     }
   ]
