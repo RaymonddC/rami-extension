@@ -7,8 +7,7 @@
 import { summarizeText } from '../utils/summarize.js';
 
 // Configuration constants
-const MAX_READINGS = 100; // Limit readings to prevent storage quota issues (Chrome has 10MB limit)
-const MAX_HIGHLIGHTS = 1000; // Limit highlights
+const MAX_READINGS = 50; // Limit readings to prevent storage quota issues (Chrome has 10MB limit)
 
 // Installation and updates
 chrome.runtime.onInstalled.addListener((details) => {
@@ -186,48 +185,6 @@ async function saveReading(data) {
 }
 
 /**
- * Highlight selected text
- */
-async function highlightSelection(info, tab) {
-  try {
-    const highlight = {
-      id: Date.now().toString(),
-      text: info.selectionText,
-      url: info.pageUrl,
-      timestamp: new Date().toISOString(),
-      color: 'yellow',
-    };
-
-    const { highlights = [] } = await chrome.storage.local.get('highlights');
-    highlights.push(highlight);
-
-    // Enforce size limit
-    if (highlights.length > MAX_HIGHLIGHTS) {
-      const removed = highlights.splice(0, highlights.length - MAX_HIGHLIGHTS);
-      console.log(`⚠️ Removed ${removed.length} old highlights (limit: ${MAX_HIGHLIGHTS})`);
-    }
-
-    await chrome.storage.local.set({ highlights });
-
-    // Inject content script to visually highlight
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: addHighlightToPage,
-      args: [info.selectionText],
-    });
-
-    chrome.notifications.create({
-      type: 'basic',
-      iconUrl: 'icons/icon48.png',
-      title: 'Text Highlighted',
-      message: 'Selection saved and highlighted',
-    });
-  } catch (error) {
-    console.error('Failed to highlight:', error);
-  }
-}
-
-/**
  * Summarize selected text
  */
 async function summarizeSelection(info, tab) {
@@ -300,7 +257,7 @@ async function performSummarization(text, options = {}) {
     console.log('📊 Background: summarizeText returned:', {
       success: result.success,
       summaryLength: result.summary?.length,
-      method: result.method
+      method: result.method,
     });
 
     if (result.success && result.summary) {
