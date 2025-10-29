@@ -12,23 +12,20 @@ import {
     Sparkles,
     ChevronRight,
     ChevronLeft,
+    Book,
+    AlertCircle,
+    Lightbulb,
 } from 'lucide-react';
+import { generateQuizFromReading } from '../utils/quizGeneration';
 
 /**
- * Shuffle array using Fisher-Yates algorithm
- */
-function shuffleArray(array) {
-    const shuffled = [...array];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-}
-
-/**
- * Quiz Component for Learning from Readings
- * Generates and manages interactive quizzes based on saved content
+ * Enhanced Quiz Component for Learning from Readings
+ * Features:
+ * - Supports Multiple Choice and True/False questions only
+ * - Uses AI summaries for better question generation
+ * - Shows detailed explanations after each answer
+ * - Provides educational feedback
+ * - Tracks learning progress
  */
 export default function Quiz({ readings, preferences }) {
     const [selectedReading, setSelectedReading] = useState(null);
@@ -40,6 +37,8 @@ export default function Quiz({ readings, preferences }) {
     const [quizMode, setQuizMode] = useState('practice'); // 'practice' or 'test'
     const [startTime, setStartTime] = useState(null);
     const [timeElapsed, setTimeElapsed] = useState(0);
+    const [showExplanation, setShowExplanation] = useState(false);
+    const [hasAnswered, setHasAnswered] = useState(false);
 
     // Timer for test mode
     useEffect(() => {
@@ -63,8 +62,7 @@ export default function Quiz({ readings, preferences }) {
 
         try {
             const generatedQuiz = await generateQuizFromReading(reading, {
-                persona: preferences?.persona || 'strategist',
-                difficulty: 'medium',
+                persona: preferences?.persona || 'mentor',
                 questionCount: mode === 'test' ? 10 : 5,
             });
 
@@ -73,13 +71,15 @@ export default function Quiz({ readings, preferences }) {
             setCurrentQuestionIndex(0);
             setAnswers({});
             setShowResults(false);
+            setShowExplanation(false);
+            setHasAnswered(false);
         } catch (error) {
             console.error('❌ Failed to generate quiz:', error);
             console.error('Error stack:', error.stack);
 
             // Show user-friendly error
             const errorMessage = error.message || 'Failed to generate quiz. Please try again.';
-            alert(`Quiz Generation Error:\n\n${errorMessage}\n\nPlease check:\n- The reading has enough content (at least 100 words)\n- Try a different reading\n- Check browser console for details`);
+            alert(`Quiz Generation Error:\n\n${errorMessage}\n\nTip: Make sure the reading has enough content (at least 100 words).`);
         } finally {
             setIsGenerating(false);
         }
@@ -90,6 +90,12 @@ export default function Quiz({ readings, preferences }) {
             ...answers,
             [questionId]: answer,
         });
+
+        // In practice mode, show explanation immediately
+        if (quizMode === 'practice') {
+            setHasAnswered(true);
+            setShowExplanation(true);
+        }
     };
 
     const handleSubmitQuiz = () => {
@@ -103,17 +109,23 @@ export default function Quiz({ readings, preferences }) {
         setAnswers({});
         setShowResults(false);
         setTimeElapsed(0);
+        setShowExplanation(false);
+        setHasAnswered(false);
     };
 
     const handleNextQuestion = () => {
         if (currentQuestionIndex < quiz.questions.length - 1) {
             setCurrentQuestionIndex(currentQuestionIndex + 1);
+            setShowExplanation(false);
+            setHasAnswered(false);
         }
     };
 
     const handlePreviousQuestion = () => {
         if (currentQuestionIndex > 0) {
             setCurrentQuestionIndex(currentQuestionIndex - 1);
+            setShowExplanation(false);
+            setHasAnswered(false);
         }
     };
 
@@ -149,7 +161,9 @@ export default function Quiz({ readings, preferences }) {
 
     const currentQuestion = quiz.questions[currentQuestionIndex];
     const progress = ((currentQuestionIndex + 1) / quiz.questions.length) * 100;
-    const allQuestionsAnswered = quiz.questions.every(q => answers[q.id]);
+    const allQuestionsAnswered = quiz.questions.every(q => answers[q.id] !== undefined);
+    const userAnswer = answers[currentQuestion.id];
+    const isCorrect = userAnswer === currentQuestion.correctAnswer;
 
     return (
         <div className="max-w-4xl mx-auto">
@@ -206,245 +220,302 @@ export default function Quiz({ readings, preferences }) {
             </div>
 
             {/* Question Card */}
-            <AnimatePresence mode="wait">
-                <motion.div
-                    key={currentQuestion.id}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="card mb-6"
-                >
-                    <QuestionCard
+            <div className="card mb-6">
+                <div className="mb-6">
+                    <div className="flex items-start gap-3 mb-4">
+                        <div className="flex-shrink-0 w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center">
+                            <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
+                                {currentQuestionIndex + 1}
+                            </span>
+                        </div>
+                        <h3 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 flex-1">
+                            {currentQuestion.question}
+                        </h3>
+                    </div>
+
+                    {/* Question Type Badge */}
+                    <div className="mb-4">
+                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-neutral-100 dark:bg-neutral-800 rounded-full text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                            {currentQuestion.type === 'multiple-choice' && '📊 Multiple Choice'}
+                            {currentQuestion.type === 'true-false' && '✓/✗ True or False'}
+                            {currentQuestion.type === 'code-test' && '💻 Code Test'}
+                        </span>
+                    </div>
+
+                    {/* Code Block for code-test questions */}
+                    {currentQuestion.type === 'code-test' && currentQuestion.code && (
+                        <div className="mb-6 bg-neutral-900 dark:bg-neutral-950 rounded-lg p-4 overflow-x-auto">
+                            <div className="text-xs text-neutral-400 mb-2 font-mono">
+                                {currentQuestion.codeLanguage || 'code'}
+                            </div>
+                            <pre className="text-sm text-neutral-100 font-mono">
+                                <code>{currentQuestion.code}</code>
+                            </pre>
+                        </div>
+                    )}
+
+                    {/* Answer Options */}
+                    <QuestionInput
                         question={currentQuestion}
-                        answer={answers[currentQuestion.id]}
-                        onAnswerSelect={(answer) => handleAnswerSelect(currentQuestion.id, answer)}
-                        showFeedback={quizMode === 'test' && showResults}
-                        quizMode={quizMode}
+                        value={userAnswer}
+                        onChange={(value) => handleAnswerSelect(currentQuestion.id, value)}
+                        showFeedback={showExplanation && hasAnswered}
+                        isCorrect={isCorrect}
                     />
-                </motion.div>
-            </AnimatePresence>
-
-            {/* Navigation */}
-            <div className="flex items-center justify-between">
-                <button
-                    onClick={handlePreviousQuestion}
-                    disabled={currentQuestionIndex === 0}
-                    className="btn-secondary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <ChevronLeft className="w-4 h-4" />
-                    Previous
-                </button>
-
-                <div className="flex items-center gap-2">
-                    {quiz.questions.map((_, index) => (
-                        <button
-                            key={index}
-                            onClick={() => setCurrentQuestionIndex(index)}
-                            className={`w-8 h-8 rounded-full transition-all ${
-                                index === currentQuestionIndex
-                                    ? 'bg-primary-500 text-white'
-                                    : answers[quiz.questions[index].id]
-                                        ? 'bg-green-500 text-white'
-                                        : 'bg-neutral-200 dark:bg-neutral-700'
-                            }`}
-                        >
-                            {index + 1}
-                        </button>
-                    ))}
                 </div>
 
-                {currentQuestionIndex === quiz.questions.length - 1 ? (
+                {/* Explanation (shown in practice mode after answering) */}
+                <AnimatePresence>
+                    {showExplanation && hasAnswered && quizMode === 'practice' && (
+                        <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="mt-6 pt-6 border-t border-neutral-200 dark:border-neutral-700"
+                        >
+                            <ExplanationPanel
+                                question={currentQuestion}
+                                userAnswer={userAnswer}
+                                isCorrect={isCorrect}
+                            />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Navigation */}
+                <div className="flex items-center justify-between pt-6 mt-6 border-t border-neutral-200 dark:border-neutral-700">
                     <button
-                        onClick={handleSubmitQuiz}
-                        disabled={!allQuestionsAnswered}
-                        className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={handlePreviousQuestion}
+                        disabled={currentQuestionIndex === 0}
+                        className="btn-secondary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        Submit Quiz
-                        <Target className="w-4 h-4" />
+                        <ChevronLeft className="w-4 h-4" />
+                        Previous
                     </button>
-                ) : (
-                    <button
-                        onClick={handleNextQuestion}
-                        className="btn-secondary flex items-center gap-2"
-                    >
-                        Next
-                        <ChevronRight className="w-4 h-4" />
-                    </button>
-                )}
-            </div>
-        </div>
-    );
-}
 
-/**
- * Question Card Component
- */
-function QuestionCard({ question, answer, onAnswerSelect, showFeedback, quizMode }) {
-    // Check if answer is correct (for practice mode immediate feedback)
-    const isCorrect = answer && (
-        (question.type !== 'short-answer' && answer === question.correctAnswer) ||
-        (question.type === 'short-answer' && answer?.toLowerCase().trim() === question.correctAnswer?.toLowerCase().trim())
-    );
+                    {/* Answer count display */}
+                    {currentQuestionIndex === quiz.questions.length - 1 && !allQuestionsAnswered && (
+                        <div className="text-sm text-orange-600 dark:text-orange-400 font-medium">
+                            {Object.keys(answers).length}/{quiz.questions.length} questions answered
+                        </div>
+                    )}
 
-    const showImmediateFeedback = quizMode === 'practice' && answer;
-
-    return (
-        <div className="space-y-6">
-            {/* Question */}
-            <div>
-                <div className="flex items-start gap-3 mb-4">
-          <span className="flex-shrink-0 w-8 h-8 bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 rounded-full flex items-center justify-center font-semibold">
-            ?
-          </span>
-                    <div className="flex-1">
-                        <h3 className="text-lg font-medium text-neutral-900 dark:text-neutral-100">
-                            {question.question}
-                        </h3>
-                        {question.hint && (
-                            <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-2 italic">
-                                Hint: {question.hint}
-                            </p>
+                    <div className="flex gap-2">
+                        {currentQuestionIndex === quiz.questions.length - 1 ? (
+                            <button
+                                onClick={handleSubmitQuiz}
+                                disabled={!allQuestionsAnswered}
+                                className={`btn-primary flex items-center gap-2 ${
+                                    !allQuestionsAnswered ? 'opacity-50 cursor-not-allowed' : ''
+                                }`}
+                                title={!allQuestionsAnswered ? 'Please answer all questions before submitting' : 'Submit quiz'}
+                            >
+                                Submit Quiz
+                                <Target className="w-4 h-4" />
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleNextQuestion}
+                                className="btn-primary flex items-center gap-2"
+                            >
+                                Next
+                                <ChevronRight className="w-4 h-4" />
+                            </button>
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* Answer Options */}
-            <div className="space-y-3">
-                {question.type === 'multiple-choice' && (
-                    <>
-                        {question.options.map((option, index) => (
-                            <AnswerOption
-                                key={index}
-                                option={option}
-                                selected={answer === option}
-                                correct={showImmediateFeedback && option === question.correctAnswer}
-                                incorrect={showImmediateFeedback && answer === option && option !== question.correctAnswer}
-                                onClick={() => onAnswerSelect(option)}
-                                disabled={showFeedback}
-                            />
-                        ))}
-                    </>
-                )}
-
-                {question.type === 'true-false' && (
-                    <>
-                        <AnswerOption
-                            option="True"
-                            selected={answer === true}
-                            correct={showImmediateFeedback && question.correctAnswer === true}
-                            incorrect={showImmediateFeedback && answer === true && question.correctAnswer === false}
-                            onClick={() => onAnswerSelect(true)}
-                            disabled={showFeedback}
-                        />
-                        <AnswerOption
-                            option="False"
-                            selected={answer === false}
-                            correct={showImmediateFeedback && question.correctAnswer === false}
-                            incorrect={showImmediateFeedback && answer === false && question.correctAnswer === true}
-                            onClick={() => onAnswerSelect(false)}
-                            disabled={showFeedback}
-                        />
-                    </>
-                )}
-
-                {question.type === 'short-answer' && (
-                    <textarea
-                        value={answer || ''}
-                        onChange={(e) => onAnswerSelect(e.target.value)}
-                        className="textarea min-h-[120px]"
-                        placeholder="Type your answer here..."
-                        disabled={showFeedback}
-                    />
-                )}
-            </div>
-
-            {/* Feedback */}
-            {(showFeedback || showImmediateFeedback) && (
-                <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`p-4 rounded-lg ${
-                        (question.type !== 'short-answer' && answer === question.correctAnswer) ||
-                        (question.type === 'short-answer' && answer?.toLowerCase().trim() === question.correctAnswer?.toLowerCase().trim())
-                            ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
-                            : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
-                    }`}
-                >
+            {/* Helpful Tip for Practice Mode */}
+            {quizMode === 'practice' && !hasAnswered && (
+                <div className="card bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
                     <div className="flex items-start gap-3">
-                        {(question.type !== 'short-answer' && answer === question.correctAnswer) ||
-                        (question.type === 'short-answer' && answer?.toLowerCase().trim() === question.correctAnswer?.toLowerCase().trim()) ? (
-                            <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
-                        ) : (
-                            <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
-                        )}
-                        <div className="flex-1">
-                            <p className="font-medium mb-1">
-                                {(question.type !== 'short-answer' && answer === question.correctAnswer) ||
-                                (question.type === 'short-answer' && answer?.toLowerCase().trim() === question.correctAnswer?.toLowerCase().trim())
-                                    ? 'Correct!'
-                                    : 'Incorrect'}
+                        <Lightbulb className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                        <div>
+                            <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                                Practice Mode
+                            </h4>
+                            <p className="text-sm text-blue-800 dark:text-blue-200">
+                                Select your answer to see a detailed explanation and learn why it's correct or incorrect.
                             </p>
-                            <p className="text-sm text-neutral-700 dark:text-neutral-300">
-                                {question.explanation}
-                            </p>
-                            {question.type === 'short-answer' && (
-                                <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-2">
-                                    <strong>Expected:</strong> {question.correctAnswer}
-                                </p>
-                            )}
                         </div>
                     </div>
-                </motion.div>
+                </div>
             )}
         </div>
     );
 }
 
 /**
- * Answer Option Component
+ * Question Input Component
  */
-function AnswerOption({ option, selected, correct, incorrect, onClick, disabled }) {
-    return (
-        <button
-            onClick={onClick}
-            disabled={disabled}
-            className={`
-        w-full p-4 rounded-lg border-2 text-left transition-all
-        ${selected && !correct && !incorrect
-                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                : correct
-                    ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                    : incorrect
-                        ? 'border-red-500 bg-red-50 dark:bg-red-900/20'
-                        : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600'
-            }
-        ${disabled ? 'cursor-default' : 'cursor-pointer'}
-      `}
-        >
-            <div className="flex items-center gap-3">
-                <div className={`
-          w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0
-          ${selected && !correct && !incorrect
-                    ? 'border-primary-500 bg-primary-500'
-                    : correct
-                        ? 'border-green-500 bg-green-500'
-                        : incorrect
-                            ? 'border-red-500 bg-red-500'
-                            : 'border-neutral-300 dark:border-neutral-600'
-                }
-        `}>
-                    {selected && !correct && !incorrect && (
-                        <div className="w-2 h-2 bg-white rounded-full" />
-                    )}
-                    {correct && <CheckCircle2 className="w-4 h-4 text-white" />}
-                    {incorrect && <XCircle className="w-4 h-4 text-white" />}
-                </div>
-                <span className="text-neutral-900 dark:text-neutral-100">
-          {typeof option === 'boolean' ? (option ? 'True' : 'False') : option}
-        </span>
+function QuestionInput({ question, value, onChange, showFeedback, isCorrect }) {
+    if (question.type === 'multiple-choice') {
+        return (
+            <div className="space-y-3">
+                {question.options.map((option) => {
+                    const isSelected = value === option;
+                    const isCorrectOption = option === question.correctAnswer;
+                    const showCorrect = showFeedback && isCorrectOption;
+                    const showWrong = showFeedback && isSelected && !isCorrectOption;
+
+                    return (
+                        <button
+                            key={option}
+                            onClick={() => onChange(option)}
+                            className={`
+                                w-full text-left p-4 rounded-lg border-2 transition-all
+                                ${isSelected && !showFeedback
+                                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                                : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600'
+                            }
+                                ${showCorrect
+                                ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                                : ''
+                            }
+                                ${showWrong
+                                ? 'border-red-500 bg-red-50 dark:bg-red-900/20'
+                                : ''
+                            }
+                            `}
+                            disabled={showFeedback}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className={`
+                                    w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0
+                                    ${isSelected && !showFeedback
+                                    ? 'border-primary-500 bg-primary-500'
+                                    : 'border-neutral-300 dark:border-neutral-600'
+                                }
+                                    ${showCorrect ? 'border-green-500 bg-green-500' : ''}
+                                    ${showWrong ? 'border-red-500 bg-red-500' : ''}
+                                `}>
+                                    {isSelected && !showFeedback && (
+                                        <div className="w-2 h-2 bg-white rounded-full" />
+                                    )}
+                                    {showCorrect && <CheckCircle2 className="w-4 h-4 text-white" />}
+                                    {showWrong && <XCircle className="w-4 h-4 text-white" />}
+                                </div>
+                                <span className="text-neutral-900 dark:text-neutral-100 flex-1">
+                                    {option}
+                                </span>
+                            </div>
+                        </button>
+                    );
+                })}
             </div>
-        </button>
+        );
+    }
+
+    if (question.type === 'true-false') {
+        return (
+            <div className="space-y-3">
+                {[true, false].map((option) => {
+                    const isSelected = value === option;
+                    const isCorrectOption = option === question.correctAnswer;
+                    const showCorrect = showFeedback && isCorrectOption;
+                    const showWrong = showFeedback && isSelected && !isCorrectOption;
+
+                    return (
+                        <button
+                            key={option.toString()}
+                            onClick={() => onChange(option)}
+                            className={`
+                                w-full text-left p-4 rounded-lg border-2 transition-all
+                                ${isSelected && !showFeedback
+                                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                                : 'border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600'
+                            }
+                                ${showCorrect ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : ''}
+                                ${showWrong ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : ''}
+                            `}
+                            disabled={showFeedback}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className={`
+                                    w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0
+                                    ${isSelected && !showFeedback
+                                    ? 'border-primary-500 bg-primary-500'
+                                    : 'border-neutral-300 dark:border-neutral-600'
+                                }
+                                    ${showCorrect ? 'border-green-500 bg-green-500' : ''}
+                                    ${showWrong ? 'border-red-500 bg-red-500' : ''}
+                                `}>
+                                    {isSelected && !showFeedback && (
+                                        <div className="w-2 h-2 bg-white rounded-full" />
+                                    )}
+                                    {showCorrect && <CheckCircle2 className="w-4 h-4 text-white" />}
+                                    {showWrong && <XCircle className="w-4 h-4 text-white" />}
+                                </div>
+                                <span className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                                    {option ? 'True' : 'False'}
+                                </span>
+                            </div>
+                        </button>
+                    );
+                })}
+            </div>
+        );
+    }
+
+    return null;
+}
+
+/**
+ * Explanation Panel Component
+ */
+function ExplanationPanel({ question, userAnswer, isCorrect }) {
+    return (
+        <div className={`
+            p-6 rounded-lg
+            ${isCorrect
+            ? 'bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800'
+            : 'bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-200 dark:border-orange-800'
+        }
+        `}>
+            <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                    {isCorrect ? (
+                        <CheckCircle2 className="w-8 h-8 text-green-600 dark:text-green-400" />
+                    ) : (
+                        <AlertCircle className="w-8 h-8 text-orange-600 dark:text-orange-400" />
+                    )}
+                </div>
+                <div className="flex-1">
+                    <h4 className={`
+                        text-lg font-semibold mb-3
+                        ${isCorrect
+                        ? 'text-green-900 dark:text-green-100'
+                        : 'text-orange-900 dark:text-orange-100'
+                    }
+                    `}>
+                        {isCorrect ? '🎉 Correct!' : '📚 Learn from this'}
+                    </h4>
+
+                    {!isCorrect && (
+                        <div className="mb-3 p-3 bg-white dark:bg-neutral-800 rounded-lg">
+                            <p className="text-sm text-neutral-700 dark:text-neutral-300">
+                                <strong>Your answer:</strong> {formatAnswer(userAnswer)}
+                            </p>
+                            <p className="text-sm text-neutral-700 dark:text-neutral-300 mt-1">
+                                <strong>Correct answer:</strong> {formatAnswer(question.correctAnswer)}
+                            </p>
+                        </div>
+                    )}
+
+                    <div className={`
+                        text-sm leading-relaxed
+                        ${isCorrect
+                        ? 'text-green-800 dark:text-green-200'
+                        : 'text-orange-800 dark:text-orange-200'
+                    }
+                    `}>
+                        <strong>💡 Explanation:</strong>
+                        <p className="mt-2">{question.explanation}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }
 
@@ -455,77 +526,99 @@ function ReadingSelector({ readings, onSelect }) {
     return (
         <div className="max-w-4xl mx-auto">
             <div className="card mb-6">
-                <div className="flex items-center gap-3 mb-6">
-                    <Brain className="w-6 h-6 text-primary-500" />
-                    <div>
-                        <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">
-                            Choose a Reading to Quiz
-                        </h2>
-                        <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                            Test your knowledge and reinforce what you've learned
-                        </p>
+                <div className="flex items-center gap-3 mb-4">
+                    <Book className="w-6 h-6 text-primary-500" />
+                    <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">
+                        Choose a Reading to Quiz
+                    </h2>
+                </div>
+                <p className="text-neutral-600 dark:text-neutral-400 mb-6">
+                    Select an article to generate personalized quiz questions. The quiz will be based on the
+                    AI summary and content of your reading.
+                </p>
+
+                {/* Tip about summaries */}
+                <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 rounded">
+                    <div className="flex items-start gap-3">
+                        <Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                            <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                                Better Questions with AI Summaries
+                            </h4>
+                            <p className="text-sm text-blue-800 dark:text-blue-200">
+                                For best results, generate an AI summary for your reading first using the "View AI Summarize" button.
+                                This helps create more focused and educational quiz questions.
+                            </p>
+                        </div>
                     </div>
                 </div>
+            </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {readings.map((reading) => {
-                        const content = reading.content || reading.text || reading.excerpt || '';
-                        const contentLength = content.trim().length;
-                        const hasEnoughContent = contentLength >= 100;
-                        const wordCount = Math.floor(contentLength / 5); // Rough word count estimation
+            <div className="space-y-4">
+                {readings.map((reading) => (
+                    <ReadingCard
+                        key={reading.id}
+                        reading={reading}
+                        onSelect={(mode) => onSelect(reading, mode)}
+                    />
+                ))}
+            </div>
+        </div>
+    );
+}
 
-                        return (
-                            <motion.div
-                                key={reading.id}
-                                whileHover={{ y: -2 }}
-                                className={`card-hover ${!hasEnoughContent ? 'opacity-50' : ''}`}
-                            >
-                                <h3 className="font-semibold mb-2 line-clamp-2">
-                                    {reading.title}
-                                </h3>
-                                <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3 line-clamp-2">
-                                    {reading.excerpt || content.substring(0, 100)}
-                                </p>
+/**
+ * Reading Card Component
+ */
+function ReadingCard({ reading, onSelect }) {
+    const hasSummary = !!(reading.aiSummary || reading.summary);
 
-                                {/* Content indicator */}
-                                <div className="flex items-center gap-2 mb-3">
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                      hasEnoughContent
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                  }`}>
-                    {hasEnoughContent ? '✓' : '⚠'} ~{wordCount} words
-                  </span>
-                                    {!hasEnoughContent && (
-                                        <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                      (needs 100+ words)
-                    </span>
-                                    )}
-                                </div>
+    return (
+        <div className="card hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
+                        {reading.title}
+                    </h3>
+                    <p className="text-sm text-neutral-600 dark:text-neutral-400 line-clamp-2 mb-3">
+                        {reading.excerpt || reading.text?.substring(0, 150) + '...'}
+                    </p>
 
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => onSelect(reading, 'practice')}
-                                        disabled={!hasEnoughContent}
-                                        className="btn-primary flex-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                        title={!hasEnoughContent ? 'Reading needs more content' : 'Start practice quiz'}
-                                    >
-                                        <Play className="w-4 h-4 inline mr-1" />
-                                        Practice
-                                    </button>
-                                    <button
-                                        onClick={() => onSelect(reading, 'test')}
-                                        disabled={!hasEnoughContent}
-                                        className="btn-secondary flex-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                        title={!hasEnoughContent ? 'Reading needs more content' : 'Start test quiz'}
-                                    >
-                                        <Target className="w-4 h-4 inline mr-1" />
-                                        Test
-                                    </button>
-                                </div>
-                            </motion.div>
-                        );
-                    })}
+                    {/* Summary indicator */}
+                    <div className="flex items-center gap-3 mb-4">
+                        {hasSummary ? (
+                            <span className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
+                                <CheckCircle2 className="w-3 h-3" />
+                                AI Summary Available
+                            </span>
+                        ) : (
+                            <span className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+                                <AlertCircle className="w-3 h-3" />
+                                No AI Summary
+                            </span>
+                        )}
+                        <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                            {new Date(reading.timestamp).toLocaleDateString()}
+                        </span>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => onSelect('practice')}
+                            className="btn-primary text-sm flex items-center gap-2"
+                        >
+                            <Play className="w-4 h-4" />
+                            Practice Quiz (5 questions)
+                        </button>
+                        <button
+                            onClick={() => onSelect('test')}
+                            className="btn-secondary text-sm flex items-center gap-2"
+                        >
+                            <Target className="w-4 h-4" />
+                            Test Mode (10 questions)
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -533,26 +626,25 @@ function ReadingSelector({ readings, onSelect }) {
 }
 
 /**
- * Quiz Results Component
+ * Quiz Results Component (keeping existing implementation)
  */
 function QuizResults({ quiz, answers, timeElapsed, quizMode, onReset, onRetry }) {
     const score = calculateScore(quiz, answers);
     const percentage = (score / quiz.questions.length) * 100;
-    const passed = percentage >= 70;
 
     return (
-        <div className="max-w-4xl mx-auto">
-            {/* Results Header */}
+        <div className="max-w-4xl mx-auto space-y-6">
+            {/* Results Summary */}
             <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="card mb-6 text-center"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="card text-center"
             >
                 <div className="text-6xl mb-4">
-                    {passed ? '🎉' : '📚'}
+                    {percentage >= 80 ? '🎉' : percentage >= 60 ? '👍' : '💪'}
                 </div>
-                <h2 className="text-3xl font-bold mb-2 text-neutral-900 dark:text-neutral-100">
-                    {passed ? 'Great Job!' : 'Keep Learning!'}
+                <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
+                    Quiz Complete!
                 </h2>
                 <p className="text-neutral-600 dark:text-neutral-400 mb-6">
                     You scored {score} out of {quiz.questions.length} ({percentage.toFixed(0)}%)
@@ -608,9 +700,7 @@ function QuizResults({ quiz, answers, timeElapsed, quizMode, onReset, onRetry })
                 <div className="space-y-4">
                     {quiz.questions.map((question, index) => {
                         const userAnswer = answers[question.id];
-                        const isCorrect = question.type === 'short-answer'
-                            ? userAnswer?.toLowerCase().trim() === question.correctAnswer?.toLowerCase().trim()
-                            : userAnswer === question.correctAnswer;
+                        const isCorrect = userAnswer === question.correctAnswer;
 
                         return (
                             <div
@@ -640,9 +730,13 @@ function QuizResults({ quiz, answers, timeElapsed, quizMode, onReset, onRetry })
                                                     <strong>Correct answer:</strong> {formatAnswer(question.correctAnswer)}
                                                 </p>
                                             )}
-                                            <p className="text-neutral-600 dark:text-neutral-400 italic mt-2">
-                                                {question.explanation}
-                                            </p>
+                                            <div className="mt-3 p-3 bg-white dark:bg-neutral-800 rounded-lg">
+                                                <p className="text-neutral-600 dark:text-neutral-400">
+                                                    <strong className="text-neutral-900 dark:text-neutral-100">💡 Explanation:</strong>
+                                                    <br />
+                                                    {question.explanation}
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -682,252 +776,29 @@ function GeneratingQuizState() {
         <div className="flex items-center justify-center h-full">
             <div className="text-center max-w-md">
                 <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                    className="text-6xl mb-4"
+                    animate={{
+                        scale: [1, 1.2, 1],
+                        rotate: [0, 180, 360]
+                    }}
+                    transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: 'easeInOut'
+                    }}
+                    className="text-6xl mb-6"
                 >
-                    <Sparkles className="w-16 h-16 mx-auto text-primary-500" />
+                    <Brain className="w-16 h-16 mx-auto text-primary-500" />
                 </motion.div>
-                <h3 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
-                    Generating Quiz...
-                </h3>
-                <p className="text-neutral-600 dark:text-neutral-400">
-                    Creating personalized questions from your reading
-                </p>
+                <motion.h3
+                    animate={{ opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                    className="text-2xl font-bold text-neutral-900 dark:text-neutral-100"
+                >
+                    Crafting Your Quiz...
+                </motion.h3>
             </div>
         </div>
     );
-}
-
-/**
- * Generate quiz from reading content
- */
-async function generateQuizFromReading(reading, options = {}) {
-    const { persona = 'strategist', difficulty = 'medium', questionCount = 5 } = options;
-
-    console.log('🎯 Generating quiz for:', reading.title);
-    console.log('📝 Reading object:', reading);
-    console.log('⚙️ Options:', options);
-
-    // Get content from various possible fields
-    const content = reading.content || reading.text || reading.excerpt || '';
-    const contentLength = content.trim().length;
-
-    console.log('📏 Content length:', contentLength);
-
-    // Validate content
-    if (contentLength < 50) {
-        console.error('❌ Content too short!', { contentLength, hasContent: !!reading.content, hasText: !!reading.text, hasExcerpt: !!reading.excerpt });
-
-        // Show helpful error with actual data
-        const errorDetails = {
-            title: reading.title,
-            hasContent: !!reading.content,
-            hasText: !!reading.text,
-            hasExcerpt: !!reading.excerpt,
-            contentLength: contentLength,
-            readingKeys: Object.keys(reading)
-        };
-
-        console.error('Reading details:', errorDetails);
-
-        throw new Error(
-            `Reading has insufficient content to generate quiz from.\n\n` +
-            `Please check:\n` +
-            `- The reading has enough content (at least 100 words)\n` +
-            `- Try saving the page again with full content\n` +
-            `- Check if the content was properly extracted\n\n` +
-            `Current content length: ${contentLength} characters`
-        );
-    }
-
-    try {
-        // Try using Chrome AI API first
-        console.log('🤖 Checking for Chrome AI...');
-        if (typeof chrome !== 'undefined' && 'ai' in chrome && chrome.ai.languageModel) {
-            console.log('✅ Chrome AI available, attempting to use...');
-            console.log('✅ Chrome AI available, attempting to use...');
-            const session = await chrome.ai.languageModel.create({
-                systemPrompt: `You are a quiz generator. Create ${questionCount} educational questions based on the provided content. Generate a mix of multiple-choice, true/false, and short-answer questions. Return ONLY valid JSON in this exact format:
-{
-  "questions": [
-    {
-      "id": "q1",
-      "type": "multiple-choice",
-      "question": "What is...",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correctAnswer": "Option A",
-      "explanation": "This is correct because...",
-      "hint": "Think about..."
-    }
-  ]
-}`,
-            });
-
-            console.log('📤 Sending prompt to AI...');
-            const prompt = `Create ${questionCount} quiz questions from this content:\n\n${content.substring(0, 2000)}\n\nReturn only valid JSON.`;
-            const response = await session.prompt(prompt);
-
-            console.log('🤖 AI Response received:', response.substring(0, 200) + '...');
-
-            // Parse the AI response
-            const jsonMatch = response.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                const parsed = JSON.parse(jsonMatch[0]);
-                console.log('✅ Successfully parsed AI response:', parsed);
-                return {
-                    title: `Quiz: ${reading.title}`,
-                    questions: parsed.questions,
-                    generationMethod: 'ai',
-                };
-            } else {
-                console.warn('⚠️ No JSON found in AI response');
-            }
-        } else {
-            console.log('ℹ️ Chrome AI not available');
-        }
-    } catch (error) {
-        console.error('⚠️ AI generation failed:', error);
-        console.error('Error details:', error.message);
-    }
-
-    // Fallback: Generate simple questions from content
-    console.log('🔄 Using fallback generation...');
-    return generateFallbackQuiz(reading, questionCount, content);
-}
-
-/**
- * Fallback quiz generation (rule-based)
- */
-function generateFallbackQuiz(reading, questionCount = 5, providedContent = null) {
-    console.log('🔧 Starting fallback quiz generation');
-    const content = providedContent || reading.content || reading.text || reading.excerpt || '';
-
-    console.log('📏 Content length:', content.length);
-
-    if (content.length < 50) {
-        console.error('❌ Content too short for quiz generation');
-        throw new Error('Reading content is too short to generate a quiz');
-    }
-
-    const sentences = content.match(/[^.!?]+[.!?]+/g) || [];
-    console.log('📝 Found sentences:', sentences.length);
-
-    const questions = [];
-
-    // Generate questions from key sentences
-    const keyPhrases = extractKeyPhrases(content);
-    console.log('🔑 Extracted key phrases:', keyPhrases);
-
-    for (let i = 0; i < Math.min(questionCount, keyPhrases.length); i++) {
-        const phrase = keyPhrases[i];
-
-        if (i % 3 === 0) {
-            // Multiple choice question
-            const correctAns = `${phrase} is discussed in detail`;
-            const options = shuffleArray([
-                correctAns,
-                'It is not mentioned',
-                'It is briefly referenced',
-                'It is the main topic',
-            ]);
-
-            questions.push({
-                id: `q${i + 1}`,
-                type: 'multiple-choice',
-                question: `What is mentioned about "${phrase}"?`,
-                options: options,
-                correctAnswer: correctAns,
-                explanation: `The text discusses "${phrase}" as part of the main content.`,
-                hint: 'Look for key terms in the reading.',
-            });
-        } else if (i % 3 === 1) {
-            // True/False question
-            questions.push({
-                id: `q${i + 1}`,
-                type: 'true-false',
-                question: `The reading discusses "${phrase}". True or False?`,
-                correctAnswer: true,
-                explanation: `The text mentions "${phrase}" as part of the content.`,
-                hint: 'Think about the main themes covered.',
-            });
-        } else {
-            // Short answer question
-            questions.push({
-                id: `q${i + 1}`,
-                type: 'short-answer',
-                question: `Describe the significance of "${phrase}" in the reading.`,
-                correctAnswer: phrase,
-                explanation: `"${phrase}" is a key concept discussed in the text.`,
-                hint: 'Consider the main ideas presented.',
-            });
-        }
-    }
-
-    console.log('✅ Generated questions:', questions.length);
-
-    if (questions.length === 0) {
-        console.error('❌ Failed to generate any questions');
-        throw new Error('Could not generate questions from this content');
-    }
-
-    return {
-        title: `Quiz: ${reading.title}`,
-        questions,
-        generationMethod: 'fallback',
-    };
-}
-
-/**
- * Extract key phrases from text
- */
-function extractKeyPhrases(text) {
-    console.log('🔍 Extracting key phrases from text...');
-
-    if (!text || text.length < 50) {
-        console.warn('⚠️ Text too short for phrase extraction');
-        return ['the main topic', 'key concepts', 'important ideas', 'the content', 'the subject'];
-    }
-
-    const words = text.split(/\s+/).filter(w => w.length > 3);
-    console.log('📝 Total words:', words.length);
-
-    const phrases = [];
-
-    // Extract noun phrases (simple heuristic: capitalize words and 2-3 word sequences)
-    for (let i = 0; i < words.length - 2; i++) {
-        const phrase = words.slice(i, i + 3).join(' ')
-            .replace(/[^\w\s]/g, '') // Remove special characters
-            .trim();
-
-        if (phrase.length > 10 && phrase.length < 60) {
-            phrases.push(phrase);
-        }
-    }
-
-    // Also extract single important words
-    const importantWords = words.filter(w =>
-        w.length > 6 &&
-        !/^(the|and|that|this|with|from|have|been|were|their|there|which|would|could|should)$/i.test(w)
-    );
-
-    // Combine and deduplicate
-    const allPhrases = [...new Set([...phrases, ...importantWords])];
-    console.log('✅ Extracted phrases:', allPhrases.length);
-
-    // If we didn't get enough phrases, add some generic ones
-    if (allPhrases.length < 5) {
-        console.warn('⚠️ Not enough phrases extracted, adding generic ones');
-        allPhrases.push(
-            'the main concept',
-            'key information',
-            'important details',
-            'the central theme',
-            'core ideas'
-        );
-    }
-
-    return allPhrases.slice(0, 15); // Return max 15 phrases
 }
 
 /**
@@ -938,15 +809,8 @@ function calculateScore(quiz, answers) {
 
     quiz.questions.forEach((question) => {
         const userAnswer = answers[question.id];
-
-        if (question.type === 'short-answer') {
-            if (userAnswer?.toLowerCase().trim() === question.correctAnswer?.toLowerCase().trim()) {
-                correct++;
-            }
-        } else {
-            if (userAnswer === question.correctAnswer) {
-                correct++;
-            }
+        if (userAnswer === question.correctAnswer) {
+            correct++;
         }
     });
 
