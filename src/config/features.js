@@ -12,8 +12,8 @@ export const FEATURES = {
   quiz: true,
 
   // Work in progress (disabled in production)
-  storyboard: false,  // Visual timeline view of concepts - needs completion
-  prompts: true,      // Custom prompt chain editor with execution visualization
+  storyboard: false, // Visual timeline view of concepts - needs completion
+  prompts: false, // Custom prompt chain editor with execution visualization
 };
 
 /**

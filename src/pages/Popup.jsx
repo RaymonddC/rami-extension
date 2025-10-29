@@ -19,12 +19,7 @@ export default function Popup() {
   const { preferences, setPreferences } = usePreferences();
   const { readings } = useSavedReadings();
   const [currentTab, setCurrentTab] = useState(null);
-  const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [loadingSummary, setLoadingSummary] = useState(false);
   const [loadingMindmap, setLoadingMindmap] = useState(false);
-  const [showSummary, setShowSummary] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     // Get current tab info
@@ -35,27 +30,6 @@ export default function Popup() {
     });
   }, []);
 
-  const saveCurrentPage = async () => {
-    if (!currentTab) return;
-
-    try {
-      const response = await chrome.runtime.sendMessage({
-        action: 'save-reading',
-        data: {
-          title: currentTab.title,
-          url: currentTab.url,
-        },
-      });
-
-      if (response.success) {
-        alert('Page saved successfully!');
-      }
-    } catch (error) {
-      console.error('Failed to save page:', error);
-      alert('Failed to save page');
-    }
-  };
-
   const openDashboard = () => {
     chrome.tabs.create({
       url: chrome.runtime.getURL('dashboard.html'),
@@ -64,52 +38,6 @@ export default function Popup() {
 
   const openOptions = () => {
     chrome.runtime.openOptionsPage();
-  };
-
-  const summarizePage = async () => {
-    if (!currentTab) return;
-
-    setLoadingSummary(true);
-    setShowSummary(true);
-    setSummary(null);
-
-    try {
-      // Get page content
-      const [result] = await chrome.scripting.executeScript({
-        target: { tabId: currentTab.id },
-        func: () => {
-          const article = document.querySelector('article') || document.body;
-          return article.innerText.substring(0, 50000); // Get first 50000 chars
-        },
-      });
-
-      const pageContent = result.result;
-
-      // Summarize using AI
-      const summaryResult = await summarizeText(pageContent, {
-        persona: preferences?.persona || 'strategist',
-        length: 'medium',
-      });
-
-      setSummary(summaryResult);
-    } catch (error) {
-      console.error('Failed to summarize:', error);
-      setSummary({
-        success: false,
-        summary: 'Failed to summarize page. Please try again.',
-        method: 'error',
-      });
-    } finally {
-      setLoadingSummary(false);
-    }
-  };
-
-  const copySummary = async () => {
-    if (summary?.summary) {
-      await navigator.clipboard.writeText(summary.summary);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
   };
 
   const generateMindmap = async () => {
@@ -280,25 +208,14 @@ export default function Popup() {
         </div>
       </div>
 
-      {/* Summary Panel */}
-      <AnimatePresence>{showSummary && <SummaryPanel summary={summary} loadingSummary={loadingSummary} onClose={() => setShowSummary(false)} onCopy={copySummary} copied={copied} persona={currentPersona} />}</AnimatePresence>
-
       {/* Quick Actions */}
       <div className="flex-1 overflow-auto">
         <div className="p-4 space-y-3">
           <QuickAction icon={<LayoutDashboard className="w-5 h-5" />} label="Open Dashboard" description="View all your saved readings" onClick={openDashboard} />
 
           <QuickAction
-            icon={loadingSummary ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-            label="Summarize Page"
-            description={loadingSummary ? 'Generating summary...' : 'Get AI summary of current page'}
-            onClick={summarizePage}
-            disabled={loadingSummary}
-          />
-
-          <QuickAction
             icon={loadingMindmap ? <Loader2 className="w-5 h-5 animate-spin" /> : <Network className="w-5 h-5" />}
-            label="Generate Mindmap"
+            label="Summarize and Generate Mindmap"
             description={loadingMindmap ? 'Using AI to generate mindmap (up to 2 min)...' : 'Create mindmap from current page'}
             onClick={() => {
               if (!loadingMindmap) {
