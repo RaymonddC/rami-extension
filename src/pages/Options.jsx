@@ -101,33 +101,6 @@ export default function Options() {
                             />
                         </div>
                     </section>
-
-                    {/* Auto Features */}
-                    <section className="card">
-                        <h2 className="text-xl font-semibold mb-4 text-neutral-900 dark:text-neutral-100">
-                            Automation
-                        </h2>
-                        <label className="flex items-center justify-between">
-                            <span>Auto-summarize saved pages</span>
-                            <input
-                                type="checkbox"
-                                checked={preferences?.autoSummarize || false}
-                                onChange={(e) => setPreferences({ ...preferences, autoSummarize: e.target.checked })}
-                                className="w-5 h-5"
-                            />
-                        </label>
-                    </section>
-
-                    {/* Save Button */}
-                    <div className="flex justify-end">
-                        <motion.button
-                            whileTap={{ scale: 0.95 }}
-                            onClick={handleSave}
-                            className="btn-primary px-8"
-                        >
-                            {saved ? '✓ Saved!' : 'Save Settings'}
-                        </motion.button>
-                    </div>
                 </div>
             </div>
         </div>
