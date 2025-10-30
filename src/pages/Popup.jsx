@@ -105,6 +105,7 @@ export default function Popup() {
           concepts: conceptResult.concepts,
           generationMethod: conceptResult.method, // Track how it was generated
           usedAI: conceptResult.method !== 'fallback',
+          persona: preferences?.persona || 'architect', // Track which persona was used
         };
 
         console.log('💾 Saving reading with', reading.concepts.length, 'concepts...');
