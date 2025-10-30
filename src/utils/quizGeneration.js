@@ -106,6 +106,7 @@ export async function generateQuizFromReading(reading, options = {}) {
             readingId: reading.id,
             questions,
             difficulty,
+            persona,
             createdAt: new Date().toISOString(),
         };
 
@@ -121,6 +122,7 @@ export async function generateQuizFromReading(reading, options = {}) {
                 readingId: reading.id,
                 questions: fallbackQuestions,
                 difficulty,
+                persona,
                 createdAt: new Date().toISOString(),
             };
         } catch (fallbackError) {

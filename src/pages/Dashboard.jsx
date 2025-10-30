@@ -192,19 +192,28 @@ export default function Dashboard() {
                     <Map className="w-5 h-5 text-neutral-600 dark:text-neutral-400" />
                     <span className="font-medium text-neutral-900 dark:text-neutral-100">Visualization Mode:</span>
                     {selectedReading && (
-                      <span
-                        className={`text-xs px-2 py-1 rounded-full ${
-                          selectedReading.usedAI === false || selectedReading.generationMethod === 'fallback'
-                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
-                            : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                        }`}
-                      >
-                        {selectedReading.usedAI === false || selectedReading.generationMethod === 'fallback'
-                          ? '⚡ Fallback Mode'
-                          : selectedReading.persona && PERSONAS[selectedReading.persona]
-                          ? `${PERSONAS[selectedReading.persona].icon} ${PERSONAS[selectedReading.persona].name}`
-                          : '🤖 AI Generated'}
-                      </span>
+                      selectedReading.usedAI === false || selectedReading.generationMethod === 'fallback' ? (
+                        <span className="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
+                          ⚡ Fallback Mode
+                        </span>
+                      ) : selectedReading.persona && PERSONAS[selectedReading.persona] ? (
+                        <div className="relative group inline-block">
+                          <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 cursor-help">
+                            {PERSONAS[selectedReading.persona].icon} {PERSONAS[selectedReading.persona].name}
+                          </span>
+                          {/* Tooltip */}
+                          <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 bg-neutral-900 dark:bg-neutral-100 text-neutral-100 dark:text-neutral-900 text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-10">
+                            <div className="font-semibold">{PERSONAS[selectedReading.persona].name}</div>
+                            <div className="text-neutral-300 dark:text-neutral-700">{PERSONAS[selectedReading.persona].description}</div>
+                            {/* Tooltip arrow */}
+                            <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-neutral-900 dark:border-t-neutral-100"></div>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                          🤖 AI Generated
+                        </span>
+                      )
                     )}
                   </div>
                   <div className="flex gap-2">
@@ -295,7 +304,20 @@ function SummaryModal({ reading, onClose }) {
           {/* Header */}
           <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 text-white flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="text-2xl">{reading.persona && PERSONAS[reading.persona] ? PERSONAS[reading.persona].icon : '🤖'}</span>
+              {reading.persona && PERSONAS[reading.persona] ? (
+                <div className="relative group">
+                  <span className="text-2xl cursor-help">{PERSONAS[reading.persona].icon}</span>
+                  {/* Tooltip */}
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 bg-neutral-900 dark:bg-neutral-100 text-neutral-100 dark:text-neutral-900 text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-10">
+                    <div className="font-semibold">{PERSONAS[reading.persona].name}</div>
+                    <div className="text-neutral-300 dark:text-neutral-700">{PERSONAS[reading.persona].description}</div>
+                    {/* Tooltip arrow */}
+                    <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-neutral-900 dark:border-t-neutral-100"></div>
+                  </div>
+                </div>
+              ) : (
+                <span className="text-2xl">🤖</span>
+              )}
               <div>
                 <h3 className="text-lg font-semibold">
                   {reading.persona && PERSONAS[reading.persona] ? `${PERSONAS[reading.persona].name} Summary` : 'AI-Generated Summary'}
@@ -329,7 +351,18 @@ function SummaryModal({ reading, onClose }) {
               {reading.generationMethod === 'fallback' ? (
                 '📝 Fallback mode'
               ) : reading.persona && PERSONAS[reading.persona] ? (
-                `${PERSONAS[reading.persona].icon} Generated by ${PERSONAS[reading.persona].name}`
+                <div className="relative group inline-block">
+                  <span className="cursor-help">
+                    {PERSONAS[reading.persona].icon} Generated by {PERSONAS[reading.persona].name}
+                  </span>
+                  {/* Tooltip */}
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 bg-neutral-900 dark:bg-neutral-100 text-neutral-100 dark:text-neutral-900 text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-10">
+                    <div className="font-semibold">{PERSONAS[reading.persona].name}</div>
+                    <div className="text-neutral-300 dark:text-neutral-700">{PERSONAS[reading.persona].description}</div>
+                    {/* Tooltip arrow */}
+                    <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-neutral-900 dark:border-t-neutral-100"></div>
+                  </div>
+                </div>
               ) : (
                 '🤖 AI-powered'
               )}
@@ -407,9 +440,24 @@ function ReadingsList({ readings, onSelect, selected, onDelete, onViewSummary, o
           <div className="flex items-center justify-between">
             <div className="text-xs text-neutral-500">{new Date(reading.timestamp).toLocaleDateString()}</div>
             {reading.usedAI !== undefined && (
-              <span className={`text-xs px-2 py-1 rounded-full ${reading.usedAI ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'}`}>
-                {reading.usedAI ? (reading.persona && PERSONAS[reading.persona] ? PERSONAS[reading.persona].icon : '🤖') : '⚡'}
-              </span>
+              reading.usedAI && reading.persona && PERSONAS[reading.persona] ? (
+                <div className="relative group inline-block">
+                  <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 cursor-help">
+                    {PERSONAS[reading.persona].icon}
+                  </span>
+                  {/* Tooltip */}
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 bg-neutral-900 dark:bg-neutral-100 text-neutral-100 dark:text-neutral-900 text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-10">
+                    <div className="font-semibold">{PERSONAS[reading.persona].name}</div>
+                    <div className="text-neutral-300 dark:text-neutral-700">{PERSONAS[reading.persona].description}</div>
+                    {/* Tooltip arrow */}
+                    <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-neutral-900 dark:border-t-neutral-100"></div>
+                  </div>
+                </div>
+              ) : (
+                <span className={`text-xs px-2 py-1 rounded-full ${reading.usedAI ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'}`}>
+                  {reading.usedAI ? '🤖' : '⚡'}
+                </span>
+              )
             )}
           </div>
         </motion.div>
