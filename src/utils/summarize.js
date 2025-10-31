@@ -2,14 +2,18 @@
  * ENHANCED Chrome AI API Utilities
  * Handles comprehensive summarization and language model interactions using Gemini Nano
  *
- * VERSION 2.0 - ENHANCED SUMMARIZER
+ * VERSION 2.1 - EDUCATIONAL CONTENT FOCUS
  *
  * KEY IMPROVEMENTS:
- * - Structured summaries with 5 sections (Core Concept, Key Points, Details, Applications, Bottom Line)
- * - Longer, more comprehensive summaries (captures 6-10 key points instead of 3-5)
- * - Enhanced fallback that extracts important concepts intelligently
- * - Better for educational/research content like academic articles
- * - ~600-800 word summaries vs ~200 word original
+ * - Prioritizes famous examples and experiments (Pavlov's dog, etc.)
+ * - Captures ALL researcher names and historical context
+ * - 6-section structure optimized for learning content
+ * - Explicit "Famous Examples & Experiments" section
+ * - Enhanced fallback with intelligent sentence scoring
+ * - Filters out metadata (article authors, publication info)
+ * - Focuses on substantive educational content
+ * - Better for psychology, science, and educational articles
+ * - ~800-1000 word comprehensive summaries
  */
 
 // Persona configurations that modify AI behavior
@@ -189,50 +193,66 @@ export async function summarizeText(text, options = {}) {
                     const isTruncated = text.length > 8000;
 
                     // Create comprehensive structured summary prompt
-                    const structuredPrompt = `You are an expert summarizer creating comprehensive summaries for learning and research.
+                    const structuredPrompt = `You are an expert educational content summarizer specializing in capturing ALL key information for learning, with special attention to famous examples, experiments, and foundational concepts.
 
 CONTENT TO SUMMARIZE${isTruncated ? ' (first 8000 characters)' : ''}:
 ${truncatedText}
 
-Create a COMPREHENSIVE, STRUCTURED summary following this format:
+Create a COMPREHENSIVE, EDUCATIONAL summary following this format:
 
 📌 CORE CONCEPT
-Write 2-3 sentences explaining what this content is fundamentally about - the main topic, thesis, or central theme.
+Write 2-3 sentences explaining what this content is fundamentally about. State the main topic and its significance clearly.
 
-🔑 KEY POINTS
-List 6-10 major ideas, concepts, findings, or arguments. Be specific and detailed. For each point:
-• State the concept clearly
-• Include relevant details or examples
-• Mention important terminology or names
+🔑 KEY CONCEPTS & PRINCIPLES (8-12 points)
+List ALL major ideas, theories, or findings. For EACH concept include:
+• The concept name/term
+• Clear explanation in simple terms
+• Who discovered/developed it (researcher names)
+• Why it's significant
+• Key characteristics or components
 
-📚 IMPORTANT DETAILS
-Capture crucial supporting information:
-• Specific examples, case studies, or experiments mentioned
-• Names of researchers, theories, or historical context
-• Processes, mechanisms, or step-by-step procedures
-• Notable statistics, dates, or data points
-• Technical terms and their definitions
+🧪 FAMOUS EXAMPLES & EXPERIMENTS (CRITICAL SECTION)
+Extract EVERY notable example, case study, and experiment mentioned:
+• Name of the example/experiment (e.g., "Pavlov's Dog", "Little Albert")
+• Researcher who conducted it
+• What happened - the actual procedure step by step
+• What was demonstrated or discovered
+• Key results and findings
+• Historical context or date if mentioned
+This is the MOST IMPORTANT section for educational content - never skip famous experiments!
 
-💡 PRACTICAL APPLICATIONS & SIGNIFICANCE
-Explain how this information matters:
-• Real-world applications and use cases
-• Implications for the field or society
-• Connections to other topics or fields
-• Why this is important to understand
-• Practical takeaways for readers
+📚 MECHANISMS & PROCESSES
+Explain HOW things work in detail:
+• Step-by-step processes
+• Underlying mechanisms
+• Technical terminology with definitions
+• Phases, stages, or components
+• Cause-and-effect relationships
+
+🌍 REAL-WORLD APPLICATIONS
+• Practical examples in everyday life
+• Modern uses and applications
+• Clinical, therapeutic, or professional applications
+• Current relevance
+• Connections to other fields
 
 🎯 BOTTOM LINE
-Write 2-3 sentences that capture the essence and most important insights. What's the one thing readers should remember?
+2-3 sentences summarizing the core insight. What's the single most important thing to remember?
 
-CRITICAL GUIDELINES:
-✓ Be THOROUGH - capture ALL major concepts, not just a few
-✓ Be SPECIFIC - include names, examples, and terminology from the text
-✓ Be INFORMATIVE - each point should teach something concrete
-✓ Use bullet points (•) for easy scanning
-✓ Prioritize completeness over brevity
-✓ Write in clear, accessible language
-✗ Don't be overly brief or vague
-✗ Don't skip important details`;
+CRITICAL REQUIREMENTS FOR EDUCATIONAL CONTENT:
+✓ ALWAYS prioritize famous examples and experiments - these are typically the most important parts
+✓ Include ALL researcher/scientist names mentioned
+✓ Be exhaustively THOROUGH - capture EVERYTHING significant
+✓ For experiments: describe what actually happened, not just vague references
+✓ Include specific details: procedures, subjects (dogs, rats, children), stimuli used, results observed
+✓ Define all technical terms clearly
+✓ Focus on substantive educational content, not metadata (ignore article authors, website info, publication details)
+✓ Make it comprehensive enough that someone could learn the topic from this summary alone
+
+✗ NEVER skip famous examples like Pavlov's dogs, Watson's Little Albert, Skinner's boxes, etc.
+✗ Don't just mention an experiment exists - explain what happened in it
+✗ Don't waste space on article metadata or author bios
+✗ Don't be vague about procedures - be specific`;
 
                     const session = await self.ai.languageModel.create({
                         systemPrompt: personaConfig.systemPrompt,
@@ -1052,15 +1072,67 @@ async function applyPersonaTone(text, personaConfig) {
 }
 
 /**
- * Fallback summarization using simple extraction
+ * Fallback summarization using intelligent extraction
+ * Focuses on educational content, examples, and key concepts
  */
 async function fallbackSummarize(text, options = {}) {
+    // Split into sentences
     const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
-    const summary = sentences.slice(0, 3).join(' ').trim();
+
+    if (sentences.length === 0) {
+        return {
+            success: true,
+            summary: text.substring(0, 500),
+            method: 'fallback'
+        };
+    }
+
+    // Score sentences based on importance indicators
+    const scoredSentences = sentences.map((sentence, index) => {
+        let score = 0;
+        const lower = sentence.toLowerCase();
+
+        // Higher score for sentences with proper names (likely researchers)
+        if (/[A-Z][a-z]+ [A-Z][a-z]+/.test(sentence)) score += 3;
+
+        // Educational keywords
+        const eduKeywords = ['experiment', 'study', 'research', 'theory', 'concept', 'principle', 'discovered', 'demonstrated', 'example', 'found that', 'showed that'];
+        eduKeywords.forEach(keyword => {
+            if (lower.includes(keyword)) score += 2;
+        });
+
+        // Famous examples indicators
+        if (lower.match(/\b(dog|rat|pigeon|child|patient|subject|participant)s?\b/)) score += 2;
+        if (lower.includes('pavlov') || lower.includes('skinner') || lower.includes('watson')) score += 5;
+
+        // Process/mechanism indicators
+        if (lower.includes('process') || lower.includes('mechanism') || lower.includes('occurs when')) score += 2;
+
+        // Important terms
+        if (lower.match(/\b(stimulus|response|conditioning|behavior|reinforcement|extinction|acquisition)\b/)) score += 2;
+
+        // Avoid meta content
+        if (lower.includes('article') || lower.includes('author') || lower.includes('written by') || lower.includes('published')) score -= 5;
+        if (lower.includes('simply psychology') || lower.includes('website')) score -= 3;
+
+        // Prefer earlier sentences (often have main concepts)
+        if (index < 5) score += 1;
+
+        return { sentence, score, index };
+    });
+
+    // Sort by score and take top sentences
+    const topSentences = scoredSentences
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 8) // Take more sentences
+        .sort((a, b) => a.index - b.index) // Restore original order
+        .map(item => item.sentence);
+
+    const summary = topSentences.join(' ').trim();
 
     return {
         success: true,
-        summary: summary || text.substring(0, 500),
+        summary: summary || sentences.slice(0, 5).join(' ').trim(),
         method: 'fallback'
     };
 }
