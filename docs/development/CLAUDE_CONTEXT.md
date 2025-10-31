@@ -19,7 +19,7 @@ You are helping build **AI Reading Studio**, a Chrome extension for the **Google
 5. **User data:** All data stored locally in Chrome storage (no server uploads)
 
 ### Design Reference
-- Figma: "Rami - Untangle Your Mind"
+- Figma: "Rami - Your Study Sidekick — Untangle, Understand, Unstoppable"
 - Link: https://www.figma.com/design/jPykGR1A1JsaBUX8YdRxtp/Rami---Untangle-Your-Mind?node-id=15-6&p=f
 
 ### Tech Stack

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Rami",
-  "version": "1.0.9",
+  "version": "1.0.45",
   "description": "Transform your reading into interactive mindmaps with AI-powered summarization and visualization",
   "permissions": [
     "storage",

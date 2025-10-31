@@ -12,7 +12,7 @@ You can generate icons from your Figma design or use tools like:
 
 ## Recommended Icon Design
 
-Based on your Figma design "Rami - Untangle Your Mind", the icon should feature:
+Based on your Figma design "Rami - Your Study Sidekick — Untangle, Understand, Unstoppable", the icon should feature:
 - The cheerful mascot character (yellow/orange)
 - Simple, recognizable at small sizes
 - Works well on both light and dark backgrounds

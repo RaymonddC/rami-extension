@@ -1,4 +1,4 @@
-# 🧠 RAMI - Untangle Your Mind
+# 🧠 RAMI - Your Study Sidekick — Untangle, Understand, Unstoppable
 
 *A Chrome Extension built with Gemini Nano for creative reading, learning, and reflection.*
 
@@ -14,7 +14,7 @@ It's designed for curious thinkers who want to **untangle complex ideas** and tr
 
 **Think:** Notion + Miro + Gemini Nano for readers, students, and creators.
 
-**Figma Design:** [Rami - Untangle Your Mind](https://www.figma.com/design/jPykGR1A1JsaBUX8YdRxtp/Rami---Untangle-Your-Mind)
+**Figma Design:** [Rami - Your Study Sidekick — Untangle, Understand, Unstoppable](https://www.figma.com/design/jPykGR1A1JsaBUX8YdRxtp/Rami---Untangle-Your-Mind)
 
 ---
 

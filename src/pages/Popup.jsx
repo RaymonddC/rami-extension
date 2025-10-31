@@ -156,7 +156,7 @@ export default function Popup() {
           <div className="flex items-center gap-3">
             <div>
               <h1 className="text-2xl font-bold">Rami</h1>
-              <p className="text-sm text-white/80 -mt-1">Untangle Your Mind</p>
+              <p className="text-sm text-white/80 -mt-1">Your Study Sidekick — Untangle, Understand, Unstoppable</p>
             </div>
           </div>
           <button onClick={openOptions} className="p-2 hover:bg-white/20 rounded-lg transition-colors">

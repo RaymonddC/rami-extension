@@ -82,29 +82,198 @@
 
 /* React Flow Custom Styles */
 .react-flow__node {
-  @apply rounded-lg shadow-md border-2 transition-all duration-200;
+  @apply rounded-xl shadow-lg border-2 transition-all duration-300;
 }
 
 .react-flow__node:hover {
-  @apply shadow-lg scale-105;
+  @apply shadow-2xl;
+  transform: translateY(-2px);
+}
+
+/* Edge styling - always visible */
+.react-flow__edge {
+  opacity: 1 !important;
 }
 
 .react-flow__edge-path {
-  @apply stroke-2 transition-all duration-200;
+  stroke: #ff6b35 !important;
+  stroke-width: 2.5px !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  filter: drop-shadow(0 1px 2px rgba(255, 107, 53, 0.2));
+}
+
+.react-flow__edge-path:hover {
+  stroke-width: 3.5px !important;
+  filter: drop-shadow(0 2px 6px rgba(255, 107, 53, 0.4));
+}
+
+/* Animated edges - dashed line animation */
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke-dasharray: 5 5;
+  animation: dashdraw 0.5s linear infinite;
+}
+
+@keyframes dashdraw {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+
+.react-flow__edge .react-flow__edge-path {
+  stroke: #ff6b35 !important;
+}
+
+/* Arrow markers */
+.react-flow__arrowhead,
+.react-flow__edge-textwrapper,
+marker path {
+  fill: #ff6b35 !important;
+  transition: all 0.3s ease;
+}
+
+marker {
+  overflow: visible;
 }
 
 .react-flow__handle {
-  @apply w-3 h-3 border-2 transition-all duration-200;
+  width: 10px !important;
+  height: 10px !important;
+  background: transparent !important;
+  border: 2px solid transparent !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
-/* Mermaid Custom Styles */
+/* Controls styling */
+.react-flow__controls {
+  @apply shadow-lg rounded-lg overflow-hidden;
+}
+
+.react-flow__controls-button {
+  @apply transition-all duration-200 hover:bg-neutral-100 dark:hover:bg-neutral-700;
+}
+
+/* Background dots */
+.react-flow__background {
+  opacity: 0.5;
+}
+
+/* Mermaid Custom Styles - Optimized for maximum spacing and readability */
 .mermaid {
   @apply flex justify-center items-center;
 }
 
-/* Add padding around mermaid diagrams for better spacing */
+/* Add generous padding around mermaid diagrams */
+.mermaid-container {
+  background: transparent;
+  width: 100%;
+  min-height: 100%;
+}
+
 .mermaid-container svg {
-  padding: 40px;
+  min-width: 1400px;
+  max-width: none !important;
+  height: auto;
+  width: auto !important;
+  display: block;
+  margin: 50px auto;
+}
+
+/* Compact text for smaller nodes */
+.mermaid-container text {
+  font-size: 13px !important;
+  font-weight: 500;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Better text contrast in dark mode */
+@media (prefers-color-scheme: dark) {
+  .mermaid-container text {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  }
+}
+
+/* Make connection lines visible */
+.mermaid-container path {
+  stroke-width: 2.5px !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+  transition: all 0.3s ease;
+}
+
+.mermaid-container path:hover {
+  stroke-width: 3px !important;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+/* Text in root node - slightly larger but still compact */
+.mermaid-container g[class*="root"] text {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+}
+
+/* Node styling with shadows */
+.mermaid-container g[class*="root"] circle,
+.mermaid-container g[class*="root"] ellipse {
+  filter: drop-shadow(0 4px 8px rgba(245, 158, 11, 0.2));
+}
+
+.mermaid-container g.section rect,
+.mermaid-container g.section circle {
+  filter: drop-shadow(0 2px 6px rgba(59, 130, 246, 0.15));
+}
+
+.mermaid-container rect,
+.mermaid-container circle,
+.mermaid-container ellipse {
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+/* Make all Mermaid nodes fully clickable */
+.mermaid-container svg {
+  pointer-events: all !important;
+}
+
+.mermaid-container g.section,
+.mermaid-container g[class*="node"],
+.mermaid-container g.mindmap-node {
+  cursor: pointer !important;
+  pointer-events: all !important;
+}
+
+/* Ensure ALL elements within nodes receive clicks */
+.mermaid-container g rect,
+.mermaid-container g circle,
+.mermaid-container g ellipse,
+.mermaid-container g polygon,
+.mermaid-container g path[fill],
+.mermaid-container g text,
+.mermaid-container g tspan {
+  pointer-events: all !important;
+}
+
+/* Add hover effect to clickable nodes */
+.mermaid-container g:has(text):hover rect,
+.mermaid-container g:has(text):hover circle,
+.mermaid-container g:has(text):hover ellipse,
+.mermaid-container g:has(text):hover polygon {
+  filter: brightness(1.1) drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15)) !important;
+  transition: filter 0.2s ease;
+}
+
+.mermaid-container g:has(text):hover text {
+  font-weight: 600 !important;
+}
+
+/* Zoom control button styles */
+button:disabled {
+  @apply opacity-40 cursor-not-allowed;
+}
+
+button:disabled:hover {
+  @apply bg-transparent dark:bg-transparent;
 }
 
 /* Selection Highlight Styles */

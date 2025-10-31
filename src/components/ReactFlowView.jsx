@@ -5,7 +5,6 @@ import ReactFlow, {
   Background,
   useNodesState,
   useEdgesState,
-  addEdge,
   MarkerType,
   Handle,
   Position,
@@ -29,13 +28,21 @@ export default function ReactFlowView({ concepts = [], onNodeClick, editable = t
 
     // Radial tree layout - center main concept, children radiate outward
     const mainConcepts = concepts.filter(c => c.type === 'main');
-    const secondaryConcepts = concepts.filter(c => c.type === 'secondary');
+    const mainConcept = mainConcepts[0];
+
+    // ONLY show secondary concepts that are connected to the main concept
+    const secondaryConcepts = concepts.filter(c => {
+      if (c.type !== 'secondary') return false;
+      // Check if main concept's connections include this secondary
+      return mainConcept && mainConcept.connections && mainConcept.connections.includes(c.id);
+    });
+
     const tertiaryConcepts = concepts.filter(c => c.type === 'tertiary');
 
     const CENTER_X = 600;
     const CENTER_Y = 400;
-    const INNER_RADIUS = 250;  // Distance from center to secondary nodes
-    const OUTER_RADIUS = 200;  // Distance from secondary to tertiary nodes
+    const INNER_RADIUS = 400;  // Distance from center to secondary nodes (increased for better spacing)
+    const OUTER_RADIUS = 300;  // Distance from secondary to tertiary nodes (increased for better spacing)
 
     const newNodes = [];
 
@@ -45,7 +52,7 @@ export default function ReactFlowView({ concepts = [], onNodeClick, editable = t
         id: concept.id,
         type: 'custom',
         position: {
-          x: CENTER_X - (mainConcepts.length > 1 ? (index - 0.5) * 100 : 0),
+          x: CENTER_X - (mainConcepts.length > 1 ? (index - 0.5) * 150 : 0), // Increased spacing between multiple main concepts
           y: CENTER_Y,
         },
         data: {
@@ -77,12 +84,14 @@ export default function ReactFlowView({ concepts = [], onNodeClick, editable = t
     });
 
     // Position tertiary concepts around their parent secondary concepts
+    // ONLY show tertiary concepts that have a parent connection
     tertiaryConcepts.forEach((concept) => {
       // Find parent secondary concept
       const parent = secondaryConcepts.find(sec =>
         sec.connections && sec.connections.includes(concept.id)
       );
 
+      // Only add this tertiary node if it has a parent (is connected)
       if (parent) {
         const parentNode = newNodes.find(n => n.id === parent.id);
         if (parentNode) {
@@ -94,8 +103,8 @@ export default function ReactFlowView({ concepts = [], onNodeClick, editable = t
           const totalSiblings = siblings.length;
 
           // Calculate angle offset for this child
-          // Spread children in an arc around the parent
-          const arcSpan = Math.PI / 3; // 60 degree arc for children
+          // Spread children in an arc around the parent with wider spacing
+          const arcSpan = Math.PI / 1.5; // 120 degree arc for children (increased for better spacing)
           const childAngle = parentNode.data.angle +
             (siblingIndex - (totalSiblings - 1) / 2) * (arcSpan / Math.max(totalSiblings - 1, 1));
 
@@ -113,62 +122,118 @@ export default function ReactFlowView({ concepts = [], onNodeClick, editable = t
             },
           });
         }
-      } else {
-        // Orphan tertiary - position in outer ring at available angle
-        const orphanIndex = newNodes.filter(n => n.data.type === 'tertiary').length;
-        const angle = (orphanIndex / Math.max(tertiaryConcepts.length, 1)) * 2 * Math.PI;
-
-        newNodes.push({
-          id: concept.id,
-          type: 'custom',
-          position: {
-            x: CENTER_X + (INNER_RADIUS + OUTER_RADIUS) * Math.cos(angle),
-            y: CENTER_Y + (INNER_RADIUS + OUTER_RADIUS) * Math.sin(angle),
-          },
-          data: {
-            label: concept.label,
-            type: concept.type,
-            concept: concept,
-          },
-        });
       }
+      // Removed orphan handling - don't show disconnected nodes
     });
 
-    // Create edges from connections
+    // Create edges from connections - STRICT ONE-TO-MANY TREE (each node has exactly one parent)
+    // Only create edges flowing DOWN the hierarchy: main -> secondary -> tertiary
+    const nodeIds = new Set(newNodes.map(n => n.id));
     const newEdges = [];
+    const createdEdges = new Set(); // Track edges to avoid duplicates
+    const nodesWithParents = new Set(); // Track nodes that already have a parent
+
+    // Only iterate through main and secondary concepts (parents)
+    // Tertiary concepts should never be sources (leaf nodes)
     concepts.forEach((concept) => {
-      if (concept.connections && concept.connections.length > 0) {
+      // Only create edges if this is a parent node (main or secondary)
+      if (concept.type !== 'tertiary' && concept.connections && concept.connections.length > 0) {
         concept.connections.forEach((targetId) => {
+          const edgeId = `${concept.id}-${targetId}`;
+
+          // Skip if edge already created or if both nodes don't exist
+          if (createdEdges.has(edgeId) || !nodeIds.has(concept.id) || !nodeIds.has(targetId)) {
+            return;
+          }
+
+          // CRITICAL: Skip if target already has a parent (enforce tree structure)
+          if (nodesWithParents.has(targetId)) {
+            return;
+          }
+
+          // Find source and target nodes
+          const sourceNode = newNodes.find(n => n.id === concept.id);
+          const targetNode = newNodes.find(n => n.id === targetId);
+
+          if (!sourceNode || !targetNode) return;
+
+          // Enforce one-to-many: only create edge if flowing down the hierarchy
+          const validConnection =
+            (concept.type === 'main' && targetNode.data.type === 'secondary') ||
+            (concept.type === 'secondary' && targetNode.data.type === 'tertiary');
+
+          if (!validConnection) return;
+
+          // Mark this target as having a parent
+          nodesWithParents.add(targetId);
+
+          // Calculate smart handle positions based on relative position
+          const dx = targetNode.position.x - sourceNode.position.x;
+          const dy = targetNode.position.y - sourceNode.position.y;
+
+          let sourceHandle = 'bottom';
+          let targetHandle = 'top';
+
+          // Determine best handles based on relative position
+          if (Math.abs(dx) > Math.abs(dy)) {
+            // Horizontal connection
+            sourceHandle = dx > 0 ? 'right' : 'left';
+            targetHandle = dx > 0 ? 'left' : 'right';
+          } else {
+            // Vertical connection
+            sourceHandle = dy > 0 ? 'bottom' : 'top';
+            targetHandle = dy > 0 ? 'top' : 'bottom';
+          }
+
           newEdges.push({
-            id: `${concept.id}-${targetId}`,
+            id: edgeId,
             source: concept.id,
             target: targetId,
             type: 'smoothstep',
             animated: true,
-            style: { stroke: '#f97316', strokeWidth: 2 },
+            style: {
+              stroke: '#ff6b35',
+              strokeWidth: 2.5,
+              strokeOpacity: 0.9,
+            },
             markerEnd: {
               type: MarkerType.ArrowClosed,
-              width: 20,
-              height: 20,
-              color: '#f97316',
+              width: 15,
+              height: 15,
+              color: '#ff6b35',
             },
+            sourceHandle,
+            targetHandle,
           });
+
+          createdEdges.add(edgeId);
         });
       }
     });
 
-    setNodes(newNodes);
+    // Remove orphaned nodes (nodes with no edges at all)
+    // Keep only nodes that are either the main node OR have at least one edge
+    const nodesInEdges = new Set();
+    newEdges.forEach(edge => {
+      nodesInEdges.add(edge.source);
+      nodesInEdges.add(edge.target);
+    });
+
+    const filteredNodes = newNodes.filter(node =>
+      node.data.type === 'main' || nodesInEdges.has(node.id)
+    );
+
+    console.log('ReactFlow - Creating nodes:', filteredNodes.length, '(filtered from', newNodes.length, ')');
+    console.log('ReactFlow - Creating edges:', newEdges.length, newEdges);
+
+    setNodes(filteredNodes);
     setEdges(newEdges);
   }, [concepts, setNodes, setEdges]);
 
-  const onConnect = useCallback(
-    (params) => {
-      if (editable) {
-        setEdges((eds) => addEdge(params, eds));
-      }
-    },
-    [editable, setEdges]
-  );
+  // Disable manual connections - users cannot add new edges
+  const onConnect = useCallback(() => {
+    // Do nothing - connections are read-only
+  }, []);
 
   const nodeTypes = {
     custom: CustomNode,
@@ -191,27 +256,54 @@ export default function ReactFlowView({ concepts = [], onNodeClick, editable = t
         onEdgesChange={editable ? onEdgesChange : undefined}
         onConnect={onConnect}
         onNodeClick={handleNodeClick}
+        onNodeDoubleClick={() => {
+          // Double-click to recenter view
+          window.requestAnimationFrame(() => {
+            const fitViewButton = document.querySelector('.react-flow__controls-fitview');
+            if (fitViewButton) fitViewButton.click();
+          });
+        }}
         nodeTypes={nodeTypes}
         nodesDraggable={true}
-        nodesConnectable={true}
+        nodesConnectable={false}
         elementsSelectable={true}
         panOnDrag={true}
         panOnScroll={true}
         zoomOnScroll={true}
         zoomOnPinch={true}
-        minZoom={0.5}
-        maxZoom={2}
+        minZoom={0.3}
+        maxZoom={2.5}
+        defaultZoom={1}
         fitView
+        fitViewOptions={{
+          padding: 0.3, // Increased padding to accommodate larger spacing between nodes
+          includeHiddenNodes: false,
+          duration: 400,
+        }}
         attributionPosition="bottom-left"
       >
-        <Background color="#94a3b8" gap={16} />
-        <Controls />
+        <Background
+          color="#94a3b8"
+          gap={20}
+          size={1.5}
+          variant="dots"
+        />
+        <Controls
+          showZoom={true}
+          showFitView={true}
+          showInteractive={false}
+          position="bottom-right"
+        />
         <MiniMap
           nodeColor={(node) => {
             if (node.data.type === 'main') return '#f97316';
+            if (node.data.type === 'secondary') return '#3b82f6';
+            if (node.data.type === 'tertiary') return '#8b5cf6';
             return '#64748b';
           }}
-          maskColor="rgba(0, 0, 0, 0.1)"
+          nodeStrokeWidth={3}
+          maskColor="rgba(0, 0, 0, 0.05)"
+          className="!bg-white/90 dark:!bg-neutral-800/90 !border !border-neutral-200 dark:!border-neutral-700 !rounded-lg"
         />
       </ReactFlow>
     </div>
@@ -224,52 +316,115 @@ export default function ReactFlowView({ concepts = [], onNodeClick, editable = t
 function CustomNode({ data }) {
   const [isHovered, setIsHovered] = useState(false);
 
-  const typeColors = {
-    main: 'bg-primary-500 text-white border-primary-600',
-    secondary: 'bg-blue-500 text-white border-blue-600',
-    tertiary: 'bg-purple-500 text-white border-purple-600',
-    default: 'bg-neutral-600 text-white border-neutral-700',
+  const typeStyles = {
+    main: {
+      bg: 'bg-gradient-to-br from-primary-500 to-primary-600',
+      text: 'text-white',
+      border: 'border-primary-600',
+      shadow: 'shadow-primary-500/30',
+      ring: 'ring-primary-400',
+    },
+    secondary: {
+      bg: 'bg-gradient-to-br from-blue-500 to-blue-600',
+      text: 'text-white',
+      border: 'border-blue-600',
+      shadow: 'shadow-blue-500/30',
+      ring: 'ring-blue-400',
+    },
+    tertiary: {
+      bg: 'bg-gradient-to-br from-purple-500 to-purple-600',
+      text: 'text-white',
+      border: 'border-purple-600',
+      shadow: 'shadow-purple-500/30',
+      ring: 'ring-purple-400',
+    },
+    default: {
+      bg: 'bg-gradient-to-br from-neutral-600 to-neutral-700',
+      text: 'text-white',
+      border: 'border-neutral-700',
+      shadow: 'shadow-neutral-500/30',
+      ring: 'ring-neutral-400',
+    },
   };
 
-  const colorClass = typeColors[data.type] || typeColors.default;
+  const styles = typeStyles[data.type] || typeStyles.default;
 
   return (
     <motion.div
-      whileHover={{ scale: 1.05 }}
+      whileHover={{ scale: 1.08, y: -2 }}
       whileTap={{ scale: 0.95 }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
       className={`
-        px-6 py-3 rounded-lg border-2 shadow-lg cursor-pointer
-        transition-all duration-200
-        ${colorClass}
-        ${isHovered ? 'shadow-xl' : ''}
+        px-6 py-3 rounded-xl border-2 cursor-pointer
+        transition-all duration-300 ease-out
+        ${styles.bg} ${styles.text} ${styles.border}
+        ${isHovered ? `shadow-2xl ${styles.shadow} ring-2 ${styles.ring}` : 'shadow-lg'}
       `}
     >
-      {/* Connection handles - these appear when hovering to create connections */}
+      {/* Invisible handles for edge attachment - users can't interact with them */}
       <Handle
+        id="top"
         type="target"
         position={Position.Top}
-        className="w-3 h-3 !bg-white border-2 border-primary-500"
+        style={{
+          width: '10px',
+          height: '10px',
+          background: 'transparent',
+          border: 'none',
+          opacity: 0,
+          pointerEvents: 'none'
+        }}
       />
       <Handle
+        id="bottom"
         type="source"
         position={Position.Bottom}
-        className="w-3 h-3 !bg-white border-2 border-primary-500"
+        style={{
+          width: '10px',
+          height: '10px',
+          background: 'transparent',
+          border: 'none',
+          opacity: 0,
+          pointerEvents: 'none'
+        }}
       />
       <Handle
+        id="left"
         type="source"
         position={Position.Left}
-        className="w-3 h-3 !bg-white border-2 border-primary-500"
+        style={{
+          width: '10px',
+          height: '10px',
+          background: 'transparent',
+          border: 'none',
+          opacity: 0,
+          pointerEvents: 'none'
+        }}
       />
       <Handle
+        id="right"
         type="source"
         position={Position.Right}
-        className="w-3 h-3 !bg-white border-2 border-primary-500"
+        style={{
+          width: '10px',
+          height: '10px',
+          background: 'transparent',
+          border: 'none',
+          opacity: 0,
+          pointerEvents: 'none'
+        }}
       />
 
-      <div className="font-medium text-sm whitespace-nowrap">
-        {data.label}
+      <div className="flex flex-col items-center gap-1">
+        <div className="font-semibold text-sm text-center">
+          {data.label}
+        </div>
+        {data.type && (
+          <div className="text-[10px] uppercase tracking-wider opacity-75 font-medium">
+            {data.type === 'main' ? '●●●' : data.type === 'secondary' ? '●●' : '●'}
+          </div>
+        )}
       </div>
     </motion.div>
   );

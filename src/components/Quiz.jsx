@@ -91,7 +91,7 @@ export default function Quiz({ readings, preferences }) {
 
         try {
             const generatedQuiz = await generateQuizFromReading(reading, {
-                persona: preferences?.persona || 'mentor',
+                persona: reading.persona || preferences?.persona || 'mentor',
                 questionCount: mode === 'test' ? 10 : 5,
             });
 
@@ -211,17 +211,11 @@ export default function Quiz({ readings, preferences }) {
                                 {quiz.persona && PERSONAS[quiz.persona] && (
                                     <div className="relative group">
                                         <span
-                                            className="inline-flex items-center justify-center w-6 h-6 text-base cursor-help"
+                                            className="inline-flex items-center justify-center w-6 h-6 text-base"
                                         >
                                             {PERSONAS[quiz.persona].icon}
                                         </span>
-                                        {/* Tooltip */}
-                                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-2 bg-neutral-900 dark:bg-neutral-100 text-neutral-100 dark:text-neutral-900 text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-10">
-                                            <div className="font-semibold">{PERSONAS[quiz.persona].name}</div>
-                                            <div className="text-neutral-300 dark:text-neutral-700">{PERSONAS[quiz.persona].description}</div>
-                                            {/* Tooltip arrow */}
-                                            <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-neutral-900 dark:border-t-neutral-100"></div>
-                                        </div>
+                        
                                     </div>
                                 )}
                             </div>
@@ -622,7 +616,7 @@ function ReadingSelector({ readings, onSelect, preferences }) {
  */
 function ReadingCard({ reading, onSelect, preferences }) {
     const hasSummary = !!(reading.aiSummary || reading.summary);
-    const currentPersona = preferences?.persona || 'strategist';
+    const currentPersona = reading.persona || preferences?.persona || 'strategist';
 
     return (
         <div className="card hover:shadow-md transition-shadow">
