@@ -28,7 +28,7 @@ export default function MermaidView({ concepts = [], title = 'Mindmap', onNodeCl
   const typedConcepts = Array.isArray(concepts) ? concepts : [];
   const mermaidRef = useRef(null);
   const [mermaidCode, setMermaidCode] = useState('');
-  const [zoom, setZoom] = useState(0.4); // Start zoomed out to fit larger diagrams
+  const [zoom, setZoom] = useState(0.3); // Start zoomed out to fit larger diagrams
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
@@ -93,216 +93,229 @@ export default function MermaidView({ concepts = [], title = 'Mindmap', onNodeCl
       // Clear previous content
       container.innerHTML = '';
 
-      // Create a fresh div for mermaid to render into
-      const div = document.createElement('div');
-      div.className = 'mermaid';
-      div.textContent = code;
-      container.appendChild(div);
-
       // Wait for DOM to be ready before rendering (prevents getComputedTextLength errors)
-      // Use requestAnimationFrame to ensure the container is fully mounted
+      // Use legacy render API which pre-renders off-screen to avoid timing issues
+      // NOTE: We don't need to create a div and append it - mermaid.render() works off-screen
       requestAnimationFrame(() => {
-        // Use modern mermaid.run() API with error handling
-        mermaid.run({ nodes: [div] })
-        .then(() => {
-          if (DEBUG) console.log('✅ Mermaid rendered successfully');
-
-          // Ensure SVG is properly rendered
-          const svg = container.querySelector('svg');
-          if (!svg) {
-            console.warn('⚠️ Mermaid rendered but no SVG found');
-            return;
-          }
-
-          // Add click handlers to mermaid nodes after rendering
-          if (onNodeClick && mermaidRef.current) {
-            const container = mermaidRef.current;
-            const svg = container.querySelector('svg');
-            if (svg) {
-              // Find all clickable node elements (sections, nodes with class names)
-              const nodeGroups = svg.querySelectorAll('g.section, g[class*="node"], g.mindmap-node');
-              const handledElements = new Set();
-
-              // Also get all text-containing groups as fallback (includes root node)
-              const allGroups = svg.querySelectorAll('g');
-
-              // Store main concept for root node matching
-              const mainConcept = typedConcepts.find(c => c.type === 'main') || typedConcepts[0];
-
-              const processNode = (nodeGroup) => {
-                // Skip if already handled
-                if (handledElements.has(nodeGroup)) return;
-
-                // Find text element (could be tspan with wrapped text)
-                const textElement = nodeGroup.querySelector('text');
-                if (!textElement) return;
-
-                // Get all text content including wrapped lines
-                let label = '';
-                const tspans = textElement.querySelectorAll('tspan');
-                if (tspans.length > 0) {
-                  // Wrapped text with <br/> - join tspan content with spaces
-                  label = Array.from(tspans).map(t => t.textContent.trim()).join(' ');
-                } else {
-                  label = textElement.textContent.trim();
-                }
-
-                // Remove duplicate text (Mermaid sometimes renders text twice)
-                // Check if text is duplicated by comparing halves
-                const words = label.split(' ');
-                const halfLength = Math.floor(words.length / 2);
-
-                if (halfLength > 0) {
-                  const firstHalf = words.slice(0, halfLength).join(' ');
-                  const secondHalf = words.slice(halfLength).join(' ');
-
-                  // If the label is duplicated exactly, take only the first half
-                  if (firstHalf === secondHalf && firstHalf.length > 0) {
-                    label = firstHalf;
-                    if (DEBUG) console.log('🔄 Removed duplicate label (exact match):', label);
-                  }
-                }
-
-                // Also check for pattern like "text text" (space-separated duplicate)
-                const labelParts = label.split(/\s{2,}/); // Split on 2+ spaces
-                if (labelParts.length === 2 && labelParts[0] === labelParts[1]) {
-                  label = labelParts[0];
-                  if (DEBUG) console.log('🔄 Removed duplicate label (space-separated):', label);
-                }
-
-                // Check for simple repetition pattern
-                const trimmed = label.trim();
-                const half = Math.floor(trimmed.length / 2);
-                if (half > 0) {
-                  const firstHalfStr = trimmed.substring(0, half);
-                  const secondHalfStr = trimmed.substring(half);
-                  if (firstHalfStr === secondHalfStr) {
-                    label = firstHalfStr;
-                    if (DEBUG) console.log('🔄 Removed duplicate label (string repetition):', label);
-                  }
-                }
-
-                if (!label) return;
-
-                // Use normalized matching to find concept
-                // Remove trailing "..." if text was truncated
-                const cleanLabel = label.replace(/\.\.\.$/,'').trim();
-                const normalizedLabel = normalizeText(cleanLabel);
-
-                // Try exact match first, then partial match (for truncated labels)
-                let concept = typedConcepts.find(c => normalizeText(c.label) === normalizedLabel);
-
-                if (!concept) {
-                  // If no exact match, try to find by partial match (label starts with the displayed text)
-                  concept = typedConcepts.find(c => normalizeText(c.label).startsWith(normalizedLabel));
-                }
-
-                // Special case: if still no match and this looks like the root node, use main concept
-                if (!concept && mainConcept) {
-                  const mainNormalized = normalizeText(mainConcept.label);
-                  // Check if this could be the main/root node
-                  if (mainNormalized === normalizedLabel || mainNormalized.startsWith(normalizedLabel)) {
-                    concept = mainConcept;
-                    if (DEBUG) console.log('✅ Matched as root/main concept:', mainConcept.label);
-                  }
-                }
-
-                if (DEBUG && !concept) {
-                  console.log(`⚠️ No match for label: "${label}"`);
-                  console.log(`   Normalized: "${normalizedLabel}"`);
-                  console.log(`   Available concepts:`, typedConcepts.map(c => c.label));
-                }
-
-                if (concept) {
-                  handledElements.add(nodeGroup);
-
-                  // Make entire node group clickable
-                  nodeGroup.style.cursor = 'pointer';
-                  nodeGroup.style.userSelect = 'none';
-
-                  // Find the shape element (rect, circle, polygon, etc.) for better click area
-                  const shapeElement = nodeGroup.querySelector('rect, circle, ellipse, polygon, path[d*="M"]');
-                  if (shapeElement) {
-                    shapeElement.style.cursor = 'pointer';
-                    shapeElement.style.pointerEvents = 'all';
-                  }
-
-                  // Create handler functions
-                  const handleMouseEnter = () => {
-                    if (textElement) textElement.style.fontWeight = 'bold';
-                    if (shapeElement) {
-                      // Don't change opacity - keep solid
-                      shapeElement.style.filter = 'brightness(1.15)';
-                    }
-                  };
-                  const handleMouseLeave = () => {
-                    if (textElement) textElement.style.fontWeight = 'normal';
-                    if (shapeElement) {
-                      shapeElement.style.filter = 'none';
-                    }
-                  };
-                  const handleClick = (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    if (onNodeClick) {
-                      onNodeClick(concept);
-                    }
-                  };
-
-                  // Add visual feedback on hover
-                  nodeGroup.addEventListener('mouseenter', handleMouseEnter);
-                  nodeGroup.addEventListener('mouseleave', handleMouseLeave);
-                  nodeGroup.addEventListener('click', handleClick);
-
-                  // Track for cleanup
-                  eventListeners.push({
-                    element: nodeGroup,
-                    type: 'mouseenter',
-                    handler: handleMouseEnter
-                  });
-                  eventListeners.push({
-                    element: nodeGroup,
-                    type: 'mouseleave',
-                    handler: handleMouseLeave
-                  });
-                  eventListeners.push({
-                    element: nodeGroup,
-                    type: 'click',
-                    handler: handleClick
-                  });
-                }
-              };
-
-              // Process specific node groups first
-              nodeGroups.forEach(processNode);
-
-              // Process all other groups as fallback
-              allGroups.forEach(processNode);
-
-              if (DEBUG) console.log(`✅ Set up ${handledElements.size} click handlers`);
+        requestAnimationFrame(() => {
+          setTimeout(async () => {
+            // Verify container is visible and has dimensions
+            const rect = container.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) {
+              console.warn('⚠️ Container not visible yet, skipping render');
+              return;
             }
-          }
-        })
-        .catch((error) => {
-          console.error('❌ Mermaid rendering error:', error);
 
-          // Show fallback error message in container
-          if (container) {
-            container.innerHTML = `
-              <div style="padding: 40px; text-align: center; color: #ef4444;">
-                <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 10px;">
-                  Failed to render mindmap
-                </h3>
-                <p style="font-size: 14px; color: #6b7280;">
-                  There was an issue rendering the diagram. Try refreshing the page or regenerating the mindmap.
-                </p>
-                <details style="margin-top: 20px; font-size: 12px; text-align: left; max-width: 500px; margin-left: auto; margin-right: auto;">
-                  <summary style="cursor: pointer; color: #6b7280;">Error details</summary>
-                  <pre style="margin-top: 10px; padding: 10px; background: #f3f4f6; border-radius: 6px; overflow: auto;">${error.message || error}</pre>
-                </details>
-              </div>
-            `;
-          }
+            try {
+              // Use legacy mermaid.render() API for better control and stability
+              // This pre-renders the diagram OFF-SCREEN and gives us the SVG string
+              // Avoids getComputedTextLength errors by not measuring in-place
+              const uniqueId = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+              const { svg: svgString } = await mermaid.render(uniqueId, code);
+
+              if (DEBUG) console.log('✅ Mermaid rendered successfully (legacy API)');
+
+              // Clear the container and insert the pre-rendered SVG
+              container.innerHTML = svgString;
+
+              // Now get the inserted SVG element
+              const svgElement = container.querySelector('svg');
+              if (!svgElement) {
+                console.warn('⚠️ Mermaid rendered but no SVG found');
+                return;
+              }
+
+              // Add click handlers to mermaid nodes after rendering
+              if (onNodeClick) {
+                // Find all clickable node elements (sections, nodes with class names)
+                const nodeGroups = svgElement.querySelectorAll('g.section, g[class*="node"], g.mindmap-node');
+                const handledElements = new Set();
+
+                // Also get all text-containing groups as fallback (includes root node)
+                const allGroups = svgElement.querySelectorAll('g');
+
+                // Store main concept for root node matching
+                const mainConcept = typedConcepts.find(c => c.type === 'main') || typedConcepts[0];
+
+                const processNode = (nodeGroup) => {
+                  // Skip if already handled
+                  if (handledElements.has(nodeGroup)) return;
+
+                  // Find text element (could be tspan with wrapped text)
+                  const textElement = nodeGroup.querySelector('text');
+                  if (!textElement) return;
+
+                  // Get all text content including wrapped lines
+                  let label = '';
+                  const tspans = textElement.querySelectorAll('tspan');
+                  if (tspans.length > 0) {
+                    // Wrapped text with <br/> - join tspan content with spaces
+                    label = Array.from(tspans).map(t => t.textContent.trim()).join(' ');
+                  } else {
+                    label = textElement.textContent.trim();
+                  }
+
+                  // Remove duplicate text (Mermaid sometimes renders text twice)
+                  // Check if text is duplicated by comparing halves
+                  const words = label.split(' ');
+                  const halfLength = Math.floor(words.length / 2);
+
+                  if (halfLength > 0) {
+                    const firstHalf = words.slice(0, halfLength).join(' ');
+                    const secondHalf = words.slice(halfLength).join(' ');
+
+                    // If the label is duplicated exactly, take only the first half
+                    if (firstHalf === secondHalf && firstHalf.length > 0) {
+                      label = firstHalf;
+                      if (DEBUG) console.log('🔄 Removed duplicate label (exact match):', label);
+                    }
+                  }
+
+                  // Also check for pattern like "text text" (space-separated duplicate)
+                  const labelParts = label.split(/\s{2,}/); // Split on 2+ spaces
+                  if (labelParts.length === 2 && labelParts[0] === labelParts[1]) {
+                    label = labelParts[0];
+                    if (DEBUG) console.log('🔄 Removed duplicate label (space-separated):', label);
+                  }
+
+                  // Check for simple repetition pattern
+                  const trimmed = label.trim();
+                  const half = Math.floor(trimmed.length / 2);
+                  if (half > 0) {
+                    const firstHalfStr = trimmed.substring(0, half);
+                    const secondHalfStr = trimmed.substring(half);
+                    if (firstHalfStr === secondHalfStr) {
+                      label = firstHalfStr;
+                      if (DEBUG) console.log('🔄 Removed duplicate label (string repetition):', label);
+                    }
+                  }
+
+                  if (!label) return;
+
+                  // Use normalized matching to find concept
+                  // Remove trailing "..." if text was truncated
+                  const cleanLabel = label.replace(/\.\.\.$/,'').trim();
+                  const normalizedLabel = normalizeText(cleanLabel);
+
+                  // Try exact match first, then partial match (for truncated labels)
+                  let concept = typedConcepts.find(c => normalizeText(c.label) === normalizedLabel);
+
+                  if (!concept) {
+                    // If no exact match, try to find by partial match (label starts with the displayed text)
+                    concept = typedConcepts.find(c => normalizeText(c.label).startsWith(normalizedLabel));
+                  }
+
+                  // Special case: if still no match and this looks like the root node, use main concept
+                  if (!concept && mainConcept) {
+                    const mainNormalized = normalizeText(mainConcept.label);
+                    // Check if this could be the main/root node
+                    if (mainNormalized === normalizedLabel || mainNormalized.startsWith(normalizedLabel)) {
+                      concept = mainConcept;
+                      if (DEBUG) console.log('✅ Matched as root/main concept:', mainConcept.label);
+                    }
+                  }
+
+                  if (DEBUG && !concept) {
+                    console.log(`⚠️ No match for label: "${label}"`);
+                    console.log(`   Normalized: "${normalizedLabel}"`);
+                    console.log(`   Available concepts:`, typedConcepts.map(c => c.label));
+                  }
+
+                  if (concept) {
+                    handledElements.add(nodeGroup);
+
+                    // Make entire node group clickable
+                    nodeGroup.style.cursor = 'pointer';
+                    nodeGroup.style.userSelect = 'none';
+
+                    // Find the shape element (rect, circle, polygon, etc.) for better click area
+                    const shapeElement = nodeGroup.querySelector('rect, circle, ellipse, polygon, path[d*="M"]');
+                    if (shapeElement) {
+                      shapeElement.style.cursor = 'pointer';
+                      shapeElement.style.pointerEvents = 'all';
+                    }
+
+                    // Create handler functions
+                    const handleMouseEnter = () => {
+                      if (textElement) textElement.style.fontWeight = 'bold';
+                      if (shapeElement) {
+                        // Don't change opacity - keep solid
+                        shapeElement.style.filter = 'brightness(1.15)';
+                      }
+                    };
+                    const handleMouseLeave = () => {
+                      if (textElement) textElement.style.fontWeight = 'normal';
+                      if (shapeElement) {
+                        shapeElement.style.filter = 'none';
+                      }
+                    };
+                    const handleClick = (e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      if (onNodeClick) {
+                        onNodeClick(concept);
+                      }
+                    };
+
+                    // Add visual feedback on hover
+                    nodeGroup.addEventListener('mouseenter', handleMouseEnter);
+                    nodeGroup.addEventListener('mouseleave', handleMouseLeave);
+                    nodeGroup.addEventListener('click', handleClick);
+
+                    // Track for cleanup
+                    eventListeners.push({
+                      element: nodeGroup,
+                      type: 'mouseenter',
+                      handler: handleMouseEnter
+                    });
+                    eventListeners.push({
+                      element: nodeGroup,
+                      type: 'mouseleave',
+                      handler: handleMouseLeave
+                    });
+                    eventListeners.push({
+                      element: nodeGroup,
+                      type: 'click',
+                      handler: handleClick
+                    });
+                  }
+                };
+
+                // Process specific node groups first
+                nodeGroups.forEach(processNode);
+
+                // Process all other groups as fallback
+                allGroups.forEach(processNode);
+
+                if (DEBUG) console.log(`✅ Set up ${handledElements.size} click handlers`);
+              }
+            } catch (error) {
+                console.error('❌ Mermaid rendering error:', error);
+                console.error('   Error type:', typeof error);
+                console.error('   Error message:', error?.message);
+                console.error('   Error stack:', error?.stack);
+                console.error('   Container dimensions:', container?.getBoundingClientRect());
+                console.error('   Mermaid code length:', code?.length);
+
+                // Show fallback error message in container
+                if (container) {
+                  container.innerHTML = `
+                    <div style="padding: 40px; text-align: center; color: #ef4444;">
+                      <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 10px;">
+                        Failed to render mindmap
+                      </h3>
+                      <p style="font-size: 14px; color: #6b7280;">
+                        There was an issue rendering the diagram. Try refreshing the page or regenerating the mindmap.
+                      </p>
+                      <details style="margin-top: 20px; font-size: 12px; text-align: left; max-width: 500px; margin-left: auto; margin-right: auto;">
+                        <summary style="cursor: pointer; color: #6b7280;">Error details</summary>
+                        <pre style="margin-top: 10px; padding: 10px; background: #f3f4f6; border-radius: 6px; overflow: auto;">${error?.message || error}</pre>
+                      </details>
+                    </div>
+                  `;
+                }
+              }
+          }, 150); // Increased delay to ensure DOM is fully ready
         });
       });
     }

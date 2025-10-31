@@ -42,7 +42,7 @@ export default function ReactFlowView({ concepts = [], onNodeClick, editable = t
     const CENTER_X = 600;
     const CENTER_Y = 400;
     const INNER_RADIUS = 400;  // Distance from center to secondary nodes (increased for better spacing)
-    const OUTER_RADIUS = 300;  // Distance from secondary to tertiary nodes (increased for better spacing)
+    const OUTER_RADIUS = 450;  // Distance from secondary to tertiary nodes (increased for better spacing)
 
     const newNodes = [];
 
@@ -66,14 +66,19 @@ export default function ReactFlowView({ concepts = [], onNodeClick, editable = t
     // Position secondary concepts in a circle around the center
     secondaryConcepts.forEach((concept, index) => {
       const angle = (index / secondaryConcepts.length) * 2 * Math.PI;
+      const x = CENTER_X + INNER_RADIUS * Math.cos(angle);
+      const y = CENTER_Y + INNER_RADIUS * Math.sin(angle);
+
+      console.log(`Secondary node ${concept.id} (${index}/${secondaryConcepts.length}):`, {
+        angle: (angle * 180 / Math.PI).toFixed(1) + '°',
+        position: { x: x.toFixed(1), y: y.toFixed(1) },
+        label: concept.label
+      });
 
       newNodes.push({
         id: concept.id,
         type: 'custom',
-        position: {
-          x: CENTER_X + INNER_RADIUS * Math.cos(angle),
-          y: CENTER_Y + INNER_RADIUS * Math.sin(angle),
-        },
+        position: { x, y },
         data: {
           label: concept.label,
           type: concept.type,
@@ -178,11 +183,18 @@ export default function ReactFlowView({ concepts = [], onNodeClick, editable = t
           if (Math.abs(dx) > Math.abs(dy)) {
             // Horizontal connection
             sourceHandle = dx > 0 ? 'right' : 'left';
-            targetHandle = dx > 0 ? 'left' : 'right';
+            targetHandle = dx > 0 ? 'left-target' : 'right-target';
           } else {
             // Vertical connection
-            sourceHandle = dy > 0 ? 'bottom' : 'top';
-            targetHandle = dy > 0 ? 'top' : 'bottom';
+            if (dy > 0) {
+              // Target is below source
+              sourceHandle = 'bottom';
+              targetHandle = 'top';
+            } else {
+              // Target is above source - use special source handle
+              sourceHandle = 'top-source';
+              targetHandle = 'bottom-target';
+            }
           }
 
           newEdges.push({
@@ -204,6 +216,7 @@ export default function ReactFlowView({ concepts = [], onNodeClick, editable = t
             },
             sourceHandle,
             targetHandle,
+            zIndex: 1, // Ensure edges render above background but below nodes
           });
 
           createdEdges.add(edgeId);
@@ -225,6 +238,30 @@ export default function ReactFlowView({ concepts = [], onNodeClick, editable = t
 
     console.log('ReactFlow - Creating nodes:', filteredNodes.length, '(filtered from', newNodes.length, ')');
     console.log('ReactFlow - Creating edges:', newEdges.length, newEdges);
+
+    // Debug: Check for nodes without edges
+    const nodesWithoutEdges = filteredNodes.filter(node => {
+      const hasEdge = newEdges.some(edge => edge.source === node.id || edge.target === node.id);
+      return !hasEdge && node.data.type !== 'main';
+    });
+    if (nodesWithoutEdges.length > 0) {
+      console.warn('⚠️ Found nodes without any edges:', nodesWithoutEdges.map(n => ({id: n.id, label: n.data.label, type: n.data.type})));
+    }
+
+    // Debug: Check edges to nodes above main (sec-5, sec-6)
+    const upwardEdges = newEdges.filter(edge => {
+      const sourceNode = filteredNodes.find(n => n.id === edge.source);
+      const targetNode = filteredNodes.find(n => n.id === edge.target);
+      if (sourceNode && targetNode) {
+        return targetNode.position.y < sourceNode.position.y; // Target is above source
+      }
+      return false;
+    });
+    console.log('⬆️ Upward edges (target above source):', upwardEdges.length, upwardEdges.map(e => ({
+      id: e.id,
+      sourceHandle: e.sourceHandle,
+      targetHandle: e.targetHandle
+    })));
 
     setNodes(filteredNodes);
     setEdges(newEdges);
@@ -362,7 +399,8 @@ function CustomNode({ data }) {
         ${isHovered ? `shadow-2xl ${styles.shadow} ring-2 ${styles.ring}` : 'shadow-lg'}
       `}
     >
-      {/* Invisible handles for edge attachment - users can't interact with them */}
+      {/* Invisible handles for edge attachment - bidirectional for flexibility */}
+      {/* Top handles - both source and target for upward/downward connections */}
       <Handle
         id="top"
         type="target"
@@ -377,6 +415,20 @@ function CustomNode({ data }) {
         }}
       />
       <Handle
+        id="top-source"
+        type="source"
+        position={Position.Top}
+        style={{
+          width: '10px',
+          height: '10px',
+          background: 'transparent',
+          border: 'none',
+          opacity: 0,
+          pointerEvents: 'none'
+        }}
+      />
+      {/* Bottom handles - both source and target */}
+      <Handle
         id="bottom"
         type="source"
         position={Position.Bottom}
@@ -389,6 +441,20 @@ function CustomNode({ data }) {
           pointerEvents: 'none'
         }}
       />
+      <Handle
+        id="bottom-target"
+        type="target"
+        position={Position.Bottom}
+        style={{
+          width: '10px',
+          height: '10px',
+          background: 'transparent',
+          border: 'none',
+          opacity: 0,
+          pointerEvents: 'none'
+        }}
+      />
+      {/* Left handles - both source and target */}
       <Handle
         id="left"
         type="source"
@@ -403,8 +469,35 @@ function CustomNode({ data }) {
         }}
       />
       <Handle
+        id="left-target"
+        type="target"
+        position={Position.Left}
+        style={{
+          width: '10px',
+          height: '10px',
+          background: 'transparent',
+          border: 'none',
+          opacity: 0,
+          pointerEvents: 'none'
+        }}
+      />
+      {/* Right handles - both source and target */}
+      <Handle
         id="right"
         type="source"
+        position={Position.Right}
+        style={{
+          width: '10px',
+          height: '10px',
+          background: 'transparent',
+          border: 'none',
+          opacity: 0,
+          pointerEvents: 'none'
+        }}
+      />
+      <Handle
+        id="right-target"
+        type="target"
         position={Position.Right}
         style={{
           width: '10px',
